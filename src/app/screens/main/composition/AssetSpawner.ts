@@ -9,26 +9,30 @@ import manifest from "../../../../manifest.json";
 import { randomFloat } from "../../../../engine/utils/random";
 import { waitFor } from "../../../../engine/utils/waitFor";
 import { CompositionAsset } from "./CompositionAsset";
-import { compositionConfig } from "./composition.config";
+import {
+  compositionConfig,
+  type AnimationProfile,
+} from "./composition.config";
 
-const SPAWNABLE_EXTENSIONS = [
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".webp",
-  ".svg",
-  ".gif",
-  ".mp4",
-  ".webm",
-  ".m4v",
-  ".ogv",
-  ".mov",
-];
+const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".svg"];
+const VIDEO_EXTENSIONS = [".mp4", ".webm", ".m4v", ".ogv", ".mov"];
+const GIF_EXTENSION = ".gif";
+
+type PoolEntry = {
+  key: string;
+  type: "image" | "video" | "gif";
+};
+
+const textModules = import.meta.glob("/public/texts/*.txt", {
+  query: "?raw",
+  import: "default",
+}) as Record<string, () => Promise<string>>;
 
 export class AssetSpawner {
   private container: Container;
   private assets: CompositionAsset[] = [];
-  private pool: string[] = [];
+  private pool: PoolEntry[] = [];
+  private phrases: string[] = [];
   private paused = false;
   private running = false;
 
@@ -42,6 +46,7 @@ export class AssetSpawner {
   }
 
   public async start(bounds: { width: number; height: number }) {
+    await this.loadPhrases();
     this.running = true;
     while (this.running) {
       if (!this.paused) {
@@ -74,15 +79,35 @@ export class AssetSpawner {
     this.assets = [];
   }
 
-  public update(ticker: Ticker, bounds: { width: number; height: number }) {
+  public update(
+    ticker: Ticker,
+    bounds: { width: number; height: number },
+    globalTime: number,
+  ) {
     for (let i = this.assets.length - 1; i >= 0; i--) {
       const asset = this.assets[i];
-      asset.update(ticker, bounds);
+      asset.update(ticker, bounds, globalTime);
       if (asset.isDead) {
         this.container.removeChild(asset.view);
         this.assets.splice(i, 1);
       }
     }
+  }
+
+  private async loadPhrases() {
+    const entries = Object.entries(textModules);
+    if (entries.length === 0) return;
+
+    const loaded = await Promise.all(
+      entries.map(async ([, loader]) => {
+        const raw = await loader();
+        return raw
+          .split(/\n\n+/)
+          .map((block) => block.trimEnd())
+          .filter((block) => block.length > 0);
+      }),
+    );
+    this.phrases = loaded.flat();
   }
 
   private buildPool() {
@@ -94,16 +119,22 @@ export class AssetSpawner {
       const srcs = Array.isArray(asset.src) ? asset.src : [asset.src];
       const firstSrc = srcs[0];
       const lower = firstSrc.toLowerCase();
+      const aliases = Array.isArray(asset.alias)
+        ? asset.alias
+        : [asset.alias];
+      const key = aliases[0] ?? firstSrc;
 
-      if (SPAWNABLE_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
-        const aliases = Array.isArray(asset.alias)
-          ? asset.alias
-          : [asset.alias];
-        const key = aliases[0] ?? firstSrc;
-        if (!seen.has(key)) {
-          seen.add(key);
-          this.pool.push(key);
-        }
+      if (seen.has(key)) continue;
+
+      if (IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
+        seen.add(key);
+        this.pool.push({ key, type: "image" });
+      } else if (VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
+        seen.add(key);
+        this.pool.push({ key, type: "video" });
+      } else if (lower.endsWith(GIF_EXTENSION)) {
+        seen.add(key);
+        this.pool.push({ key, type: "gif" });
       }
     }
   }
@@ -117,27 +148,28 @@ export class AssetSpawner {
       }
     }
 
-    const view = await this.createView();
+    const { view, profile } = await this.createView();
     if (!view) return;
 
-    const asset = new CompositionAsset(view, bounds);
+    const asset = new CompositionAsset(view, bounds, profile);
     this.assets.push(asset);
     this.container.addChild(view);
   }
 
-  private async createView(): Promise<Container | undefined> {
-    const isText =
-      Math.random() < compositionConfig.textWeight || this.pool.length === 0;
+  private async createView(): Promise<{
+    view: Container;
+    profile: AnimationProfile;
+  }> {
+    const hasMedia = this.pool.length > 0;
+    const isText = !hasMedia || Math.random() < 0.25;
 
-    if (isText) {
+    if (isText && this.phrases.length > 0) {
       const phrase =
-        compositionConfig.textPhrases[
-          Math.floor(Math.random() * compositionConfig.textPhrases.length)
-        ];
+        this.phrases[Math.floor(Math.random() * this.phrases.length)];
       const text = new Text({
         text: phrase,
         style: {
-          fontFamily: "Arial",
+          fontFamily: "Caveat, cursive",
           fontSize: 32 + Math.random() * 64,
           fill: 0xffffff,
           dropShadow: {
@@ -149,38 +181,33 @@ export class AssetSpawner {
         },
       });
       text.anchor.set(0.5);
-      return text;
+      return { view: text, profile: "gentle" };
     }
 
-    const key = this.pool[Math.floor(Math.random() * this.pool.length)];
-    const lower = key.toLowerCase();
+    const entry = this.pool[Math.floor(Math.random() * this.pool.length)];
 
-    if (lower.endsWith(".gif")) {
-      const source = await Assets.load(key);
+    if (entry.type === "gif") {
+      const source = await Assets.load(entry.key);
       const gif = new GifSprite({ source, autoPlay: true });
       gif.anchor.set(0.5);
       gif.scale.set(0.25 + Math.random() * 0.5);
-      return gif;
+      return { view: gif, profile: "lively" };
     }
 
-    if (
-      [".mp4", ".webm", ".m4v", ".ogv", ".mov"].some((ext) =>
-        lower.endsWith(ext),
-      )
-    ) {
-      const texture = await Assets.load<Texture>(key);
+    if (entry.type === "video") {
+      const texture = await Assets.load<Texture>(entry.key);
       const source = texture.source as VideoSource;
       const videoElement = source.resource;
       videoElement.loop = true;
       videoElement?.play?.();
       const video = new Sprite({ texture, anchor: 0.5 });
       video.scale.set(0.25 + Math.random() * 0.5);
-      return video;
+      return { view: video, profile: "gentle" };
     }
 
-    const texture = await Assets.load<Texture>(key);
+    const texture = await Assets.load<Texture>(entry.key);
     const sprite = new Sprite({ texture, anchor: 0.5 });
     sprite.scale.set(0.25 + Math.random() * 0.5);
-    return sprite;
+    return { view: sprite, profile: "gentle" };
   }
 }
