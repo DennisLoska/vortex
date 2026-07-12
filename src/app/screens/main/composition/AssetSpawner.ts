@@ -87,22 +87,22 @@ export class AssetSpawner {
 
   private buildPool() {
     const seen = new Set<string>();
+    const defaultBundle = manifest.bundles.find((b) => b.name === "default");
+    const assets = defaultBundle?.assets ?? [];
 
-    for (const bundle of manifest.bundles) {
-      for (const asset of bundle.assets) {
-        const srcs = Array.isArray(asset.src) ? asset.src : [asset.src];
-        const firstSrc = srcs[0];
-        const lower = firstSrc.toLowerCase();
+    for (const asset of assets) {
+      const srcs = Array.isArray(asset.src) ? asset.src : [asset.src];
+      const firstSrc = srcs[0];
+      const lower = firstSrc.toLowerCase();
 
-        if (SPAWNABLE_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
-          const aliases = Array.isArray(asset.alias)
-            ? asset.alias
-            : [asset.alias];
-          const key = aliases[0] ?? firstSrc;
-          if (!seen.has(key)) {
-            seen.add(key);
-            this.pool.push(key);
-          }
+      if (SPAWNABLE_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
+        const aliases = Array.isArray(asset.alias)
+          ? asset.alias
+          : [asset.alias];
+        const key = aliases[0] ?? firstSrc;
+        if (!seen.has(key)) {
+          seen.add(key);
+          this.pool.push(key);
         }
       }
     }
