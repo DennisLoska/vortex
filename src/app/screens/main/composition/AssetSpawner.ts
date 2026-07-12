@@ -36,11 +36,14 @@ export class AssetSpawner {
 
   constructor(container: Container) {
     this.container = container;
-    this.buildPool();
   }
 
   public get isPaused() {
     return this.paused;
+  }
+
+  public setProject(projectName: string) {
+    this.buildPool(projectName);
   }
 
   public async start(bounds: { width: number; height: number }) {
@@ -109,7 +112,8 @@ export class AssetSpawner {
     }
   }
 
-  private buildPool() {
+  private buildPool(projectName: string) {
+    this.pool = [];
     const seen = new Set<string>();
     const defaultBundle = manifest.bundles.find((b) => b.name === "default");
     const assets = defaultBundle?.assets ?? [];
@@ -123,8 +127,10 @@ export class AssetSpawner {
 
       if (seen.has(key)) continue;
 
-      // exclude background videos — they belong to BackgroundLayer only
-      if (key.startsWith("main/backgrounds/")) continue;
+      // only include assets from current project
+      if (!key.startsWith(projectName)) continue;
+      // exclude backgrounds — BackgroundLayer handles them
+      if (key.startsWith(`${projectName}/backgrounds/`)) continue;
 
       if (IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
         seen.add(key);
@@ -179,6 +185,7 @@ export class AssetSpawner {
   }
 
   private async spawn(bounds: { width: number; height: number }) {
+    if (this.pool.length === 0) return;
     if (this.assets.length >= compositionConfig.maxAssets) {
       const oldest = this.assets.shift();
       if (oldest) {

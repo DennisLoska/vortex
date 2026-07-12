@@ -2,7 +2,7 @@ import { Container, Text } from "pixi.js";
 
 import { randomFloat } from "../../../../engine/utils/random";
 
-const textModules = import.meta.glob("/public/texts/*.txt", {
+const textModules = import.meta.glob("/projects/*/texts/*.txt", {
   query: "?raw",
   import: "default",
 }) as Record<string, () => Promise<string>>;
@@ -17,6 +17,11 @@ export class TextOverlay extends Container {
   private fadingOut = false;
   private boundsWidth = 1920;
   private boundsHeight = 1080;
+  private projectName = "";
+
+  public setProject(name: string) {
+    this.projectName = name;
+  }
 
   public get textPosition(): { x: number; y: number } | null {
     if (!this.currentText) return null;
@@ -24,7 +29,9 @@ export class TextOverlay extends Container {
   }
 
   public async loadPhrases() {
-    const entries = Object.entries(textModules);
+    const entries = Object.entries(textModules).filter(([path]) =>
+      path.startsWith(`/projects/${this.projectName}/texts/`),
+    );
     if (entries.length === 0) return;
 
     const loaded = await Promise.all(

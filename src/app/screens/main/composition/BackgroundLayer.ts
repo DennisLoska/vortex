@@ -28,8 +28,13 @@ export class BackgroundLayer extends Container {
 
   private zoomData = new Map<Sprite, { baseScale: number; age: number }>();
   private readonly zoomRate = 0.008;
+  private loadGen = 0;
 
-  public async setMultipleBackgrounds() {
+  public async setMultipleBackgrounds(projectName: string) {
+    this.loadGen++;
+    const gen = this.loadGen;
+    this.textures = [];
+    this.videos = [];
     const videoUrls: string[] = [];
     const imageUrls: string[] = [];
 
@@ -37,7 +42,7 @@ export class BackgroundLayer extends Container {
       for (const asset of bundle.assets) {
         const srcs = Array.isArray(asset.src) ? asset.src : [asset.src];
         const firstSrc = srcs[0];
-        if (!firstSrc.startsWith("main/backgrounds/")) continue;
+        if (!firstSrc.startsWith(`${projectName}/backgrounds/`)) continue;
 
         const aliases = Array.isArray(asset.alias)
           ? asset.alias
@@ -57,7 +62,7 @@ export class BackgroundLayer extends Container {
       }
     }
 
-    this.loadAllInBackground(videoUrls, imageUrls);
+    this.loadAllInBackground(videoUrls, imageUrls, gen);
 
     while (this.textures.length === 0) {
       await new Promise((r) => setTimeout(r, 100));
@@ -79,7 +84,7 @@ export class BackgroundLayer extends Container {
     this.nextAutoDelay = 999;
   }
 
-  private async loadAllInBackground(videoUrls: string[], imageUrls: string[]) {
+  private async loadAllInBackground(videoUrls: string[], imageUrls: string[], gen: number) {
     const timeout = (ms: number) =>
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("timeout")), ms),
@@ -105,6 +110,7 @@ export class BackgroundLayer extends Container {
         timeout(8000),
       ]);
 
+      if (gen !== this.loadGen) return;
       const tex = Texture.from(video);
       this.videos.push(video);
       this.textures.push(tex);
@@ -116,6 +122,7 @@ export class BackgroundLayer extends Container {
       const img = new Image();
       img.src = url;
       await Promise.race([img.decode(), timeout(8000)]);
+      if (gen !== this.loadGen) return;
       const tex = Texture.from(img);
       this.textures.push(tex);
     };
@@ -207,7 +214,7 @@ export class BackgroundLayer extends Container {
   public update(dt: number) {
     const safeDt = Math.min(dt, 0.1);
 
-    // --- initial fade-in (slow ramp from black) ---
+    // --- initial fade-in ---
     if (this.needsFadeIn && this.activeSprite !== null) {
       this.applyZoom(this.activeSprite, safeDt);
       this.fadeInAlpha = Math.min(this.fadeInAlpha + safeDt / 2, 1);
