@@ -35,24 +35,24 @@ export const animationProfiles: Record<AnimationProfile, ProfileConfig> = {
 export type WebcamPreset = { x: number; y: number; scale: number };
 
 export const webcamPresets: WebcamPreset[] = [
-  { x: 0.05, y: 0.05, scale: 0.2 },
-  { x: 0.75, y: 0.05, scale: 0.2 },
-  { x: 0.05, y: 0.75, scale: 0.2 },
-  { x: 0.75, y: 0.75, scale: 0.2 },
-  { x: 0.4, y: 0.05, scale: 0.2 },
-  { x: 0.4, y: 0.75, scale: 0.2 },
-  { x: 0.05, y: 0.4, scale: 0.2 },
-  { x: 0.75, y: 0.4, scale: 0.2 },
-  { x: 0.4, y: 0.4, scale: 0.25 },
-  { x: 0.75, y: 0.75, scale: 0.15 },
+  { x: 0.05, y: 0.05, scale: 1.0 },
+  { x: 0.75, y: 0.05, scale: 1.0 },
+  { x: 0.05, y: 0.75, scale: 1.0 },
+  { x: 0.75, y: 0.75, scale: 1.0 },
+  { x: 0.4, y: 0.05, scale: 1.0 },
+  { x: 0.4, y: 0.75, scale: 1.0 },
+  { x: 0.05, y: 0.4, scale: 1.0 },
+  { x: 0.75, y: 0.4, scale: 1.0 },
+  { x: 0.4, y: 0.4, scale: 1.2 },
+  { x: 0.75, y: 0.75, scale: 0.8 },
 ];
 
 export const webcamConfig = {
   autoJumpInterval: { min: 30, max: 60 },
   mask: {
     cornerRadius: 24,
-    width: 320,
-    height: 240,
+    width: 480,
+    height: 360,
     idleScalePulse: { min: 0.97, max: 1.03 },
     idleRotationRange: 1,
     idleCycle: 4,
