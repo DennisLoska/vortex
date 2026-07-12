@@ -1,27 +1,54 @@
 import { Container, Sprite, Texture, VideoSource } from "pixi.js";
 
 export class BackgroundLayer extends Container {
-  private sprites: Sprite[] = [];
-  private currentIdx = -1;
+  // Only ever two sprites: one active, one temporary for crossfade
+  private activeSprite: Sprite | null = null;
+  private tempSprite: Sprite | null = null;
   private lastBounds = { width: 1920, height: 1080 };
   private transitioning = false;
   private transitionDuration = 2.5;
   private transitionElapsed = 0;
+
+  // pool of loaded textures for cycling through backgrounds
+  private bgTextures: Texture[] = [];
+  private nextTextureIdx = 0;
 
   // ticker-based timer for next transition (replaces setTimeout)
   private autoTimer = 0;
   private nextAutoDelay = 30 + Math.random() * 60; // seconds
 
   public async setBackground(texture: Texture) {
-    const sprite = new Sprite({ texture, anchor: 0.5 });
-    this.addChild(sprite);
-    this.sprites.push(sprite);
+    if (!this.activeSprite) {
+      this.activeSprite = new Sprite({ texture, anchor: 0.5 });
+      this.addChild(this.activeSprite);
+      this.resize(this.lastBounds.width, this.lastBounds.height);
+    } else {
+      await this.fadeToNew(texture);
+    }
+  }
+
+  public async setMultipleBackgrounds(textures: Texture[]) {
+    if (textures.length === 0) return;
+
+    this.bgTextures = textures;
+    this.nextTextureIdx = Math.floor(Math.random() * textures.length);
+
+    // start with the first texture
+    const firstTex = textures[this.nextTextureIdx];
+    this.activeSprite = new Sprite({ texture: firstTex, anchor: 0.5 });
+    this.addChild(this.activeSprite);
     this.resize(this.lastBounds.width, this.lastBounds.height);
+
+    // advance to next texture for the first auto-transition
+    this.nextTextureIdx = (this.nextTextureIdx + 1) % textures.length;
   }
 
   public resize(width: number, height: number) {
     this.lastBounds = { width, height };
-    for (const sprite of this.sprites) {
+    const sprites = [this.activeSprite, this.tempSprite].filter(
+      Boolean,
+    ) as Sprite[];
+    for (const sprite of sprites) {
       const texture = sprite.texture;
       const isVideo = texture.source instanceof VideoSource;
       if (isVideo) {
@@ -37,8 +64,7 @@ export class BackgroundLayer extends Container {
 
   public update(dt: number) {
     // handle transition fade
-    if (this.transitioning && this.currentIdx >= 0) {
-      this.transitionElapsed += dt;
+    if (this.transitioning && this.activeSprite !== null) {
       const progress = Math.min(
         this.transitionElapsed / this.transitionDuration,
         1,
@@ -50,44 +76,28 @@ export class BackgroundLayer extends Container {
           ? 2 * progress * progress
           : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
-      if (this.currentIdx >= 0 && this.currentIdx < this.sprites.length) {
-        this.sprites[this.currentIdx].alpha = 1 - eased;
-      }
-      if (this.nextSprite !== null && this.nextSprite !== undefined) {
-        this.nextSprite.alpha = eased;
+      this.activeSprite.alpha = 1 - eased;
+      if (this.tempSprite !== null) {
+        this.tempSprite.alpha = eased;
       }
 
       if (progress >= 1) {
-        // transition complete — clean up old sprite
-        const oldSprite = this.sprites[this.currentIdx];
-        this.removeChild(oldSprite);
-        oldSprite.destroy();
-        this.sprites.splice(this.currentIdx, 1);
+        // transition complete — swap roles
+        const oldActive = this.activeSprite;
+        this.removeChild(oldActive);
+        oldActive.destroy();
 
-        // promote next to current and remove it from the array
-        // (it was added as a temporary clone during transition)
-        if (this.nextSprite !== null && this.nextSprite !== undefined) {
-          const idx = this.sprites.indexOf(this.nextSprite!);
-          if (idx >= 0) {
-            this.sprites.splice(idx, 1);
-          }
-          this.removeChild(this.nextSprite!);
-          // keep it as the active sprite — attach to currentIdx slot
-          this.sprites.push(this.nextSprite!);
-        }
+        this.activeSprite = this.tempSprite!;
+        this.activeSprite!.alpha = 1;
+        this.tempSprite = null;
 
-        this.currentIdx = this.sprites.length - 1;
         this.transitioning = false;
         this.transitionElapsed = 0;
-        this.nextSprite = null;
 
         // ensure current video is playing
-        const curSprite = this.sprites[this.currentIdx];
-        if (curSprite) {
-          const source = curSprite.texture.source as VideoSource;
-          const video = source.resource;
-          video?.play?.();
-        }
+        const source = this.activeSprite!.texture.source as VideoSource;
+        const video = source.resource;
+        video?.play?.();
 
         // reset auto timer for next transition
         this.autoTimer = 0;
@@ -95,31 +105,43 @@ export class BackgroundLayer extends Container {
       }
     } else {
       // ticker-based auto-transition (replaces setTimeout)
-      if (this.sprites.length >= 2 && !this.transitioning) {
+      if (this.activeSprite !== null && !this.transitioning) {
         this.autoTimer += dt;
         if (this.autoTimer >= this.nextAutoDelay) {
-          this.transitionToRandom();
+          this.transitionToNext();
         }
       }
     }
   }
 
-  private nextSprite: Sprite | null = null;
+  private async fadeToNew(texture: Texture) {
+    if (this.transitioning) return;
 
-  public transitionToRandom() {
-    if (this.sprites.length < 2 || this.transitioning) return;
+    const newSprite = new Sprite({ texture, anchor: 0.5 });
+    this.addChild(newSprite);
+    this.tempSprite = newSprite;
 
-    // pick a different sprite index to fade in from the existing set
-    let targetIdx = Math.floor(Math.random() * this.sprites.length);
-    while (targetIdx === this.currentIdx && this.sprites.length > 1) {
-      targetIdx = Math.floor(Math.random() * this.sprites.length);
-    }
+    // ensure the target video is playing
+    const source = newSprite.texture.source as VideoSource;
+    const video = source.resource;
+    video?.play?.();
+
+    this.transitioning = true;
+    this.transitionDuration = 2 + Math.random() * 2;
+    this.transitionElapsed = 0;
+  }
+
+  private transitionToNext() {
+    if (this.activeSprite === null || this.transitioning) return;
+    if (this.bgTextures.length < 2) return;
+
+    const nextTex = this.bgTextures[this.nextTextureIdx];
+    this.nextTextureIdx = (this.nextTextureIdx + 1) % this.bgTextures.length;
 
     // create a clone sprite for the incoming video
-    const sourceTexture = this.sprites[targetIdx].texture;
-    const newSprite = new Sprite({ texture: sourceTexture, anchor: 0.5 });
+    const newSprite = new Sprite({ texture: nextTex, anchor: 0.5 });
     this.addChild(newSprite);
-    this.nextSprite = newSprite;
+    this.tempSprite = newSprite;
 
     // ensure the target video is playing
     const source = newSprite.texture.source as VideoSource;

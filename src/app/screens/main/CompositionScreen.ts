@@ -127,14 +127,16 @@ export class CompositionScreen extends Container {
       }
     }
 
-    // load all and pick one to start, then schedule transitions
+    // load all textures, pick one to start, then schedule auto-transitions
+    const textures: Texture[] = [];
     for (const key of bgKeys) {
       const texture = await Assets.load<Texture>(key);
-      await this.background.setBackground(texture);
+      textures.push(texture);
     }
 
-    if (bgKeys.length > 0) {
-      this.background.transitionToRandom();
+    if (textures.length > 0) {
+      // set the first one as active, then crossfade through the rest
+      await this.background.setMultipleBackgrounds(textures);
     }
   }
 
