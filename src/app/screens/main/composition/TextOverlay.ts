@@ -1,5 +1,7 @@
 import { Container, Text } from "pixi.js";
 
+import { randomFloat } from "../../../../engine/utils/random";
+
 const textModules = import.meta.glob("/public/texts/*.txt", {
   query: "?raw",
   import: "default",
@@ -47,8 +49,9 @@ export class TextOverlay extends Container {
       },
     });
     text.anchor.set(0.5);
-    text.x = this.width * 0.5;
-    text.y = this.height * 0.5;
+    const pad = 80;
+    text.x = randomFloat(pad, Math.max(pad, this.width - pad));
+    text.y = randomFloat(pad, Math.max(pad, this.height - pad));
     text.alpha = 0;
     this.addChild(text);
     this.currentText = text;
@@ -107,8 +110,6 @@ export class TextOverlay extends Container {
 
     if (this.currentText) {
       this.currentText.style.wordWrapWidth = width * 0.6;
-      this.currentText.x = width * 0.5;
-      this.currentText.y = height * 0.5;
     }
   }
 }
