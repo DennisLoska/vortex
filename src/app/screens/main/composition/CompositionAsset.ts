@@ -15,6 +15,7 @@ export class CompositionAsset {
   private lifetime: number;
   private age = 0;
   private disposed = false;
+  private fadingOut = false;
 
   constructor(view: Container, bounds: { width: number; height: number }) {
     this.view = view;
@@ -55,7 +56,8 @@ export class CompositionAsset {
     this.age += ticker.deltaMS;
     this.behavior.update({ asset: this.view, bounds, ticker });
 
-    if (this.age >= this.lifetime - 1000 && this.view.alpha > 0) {
+    if (this.age >= this.lifetime - 1000 && !this.fadingOut) {
+      this.fadingOut = true;
       animate(this.view, { alpha: 0 }, { duration: 0.5 });
     }
 
