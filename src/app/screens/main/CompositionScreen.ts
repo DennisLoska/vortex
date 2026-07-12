@@ -105,11 +105,11 @@ export class CompositionScreen extends Container {
       if (event.code === "KeyR") {
         this.reset();
       }
-      if (event.ctrlKey && event.code === "KeyN") {
+      if (event.shiftKey && event.code === "KeyN") {
         event.preventDefault();
         this.textOverlay.next();
       }
-      if (event.code === "KeyN" && !event.ctrlKey) {
+      if (event.code === "KeyN" && !event.shiftKey) {
         this.webcam.nextPreset();
       }
     });
