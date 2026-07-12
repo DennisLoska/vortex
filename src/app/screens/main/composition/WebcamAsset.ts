@@ -1,16 +1,24 @@
-import { animate } from "motion";
-import type { ObjectTarget } from "motion/react";
+import type { Ticker } from "pixi.js";
 import { Container, Sprite, Texture, VideoSource } from "pixi.js";
 
 import { randomFloat } from "../../../../engine/utils/random";
-import { waitFor } from "../../../../engine/utils/waitFor";
-import { compositionConfig } from "./composition.config";
+import { webcamConfig, webcamPresets } from "./composition.config";
 
 export class WebcamAsset extends Container {
   private videoElement: HTMLVideoElement | undefined;
   private sprite: Sprite | undefined;
-  private currentCornerIndex = 0;
-  private running = false;
+  private currentPresetIndex = 0;
+  private bounds = { width: 1920, height: 1080 };
+  private autoJumpTimer = 0;
+  private nextAutoJump = randomFloat(
+    webcamConfig.autoJumpInterval.min,
+    webcamConfig.autoJumpInterval.max,
+  );
+  private idleTime = 0;
+
+  constructor() {
+    super();
+  }
 
   public async init() {
     try {
@@ -25,15 +33,13 @@ export class WebcamAsset extends Container {
       const texture = new Texture({ source });
       this.sprite = new Sprite({ texture, anchor: 0.5 });
       this.addChild(this.sprite);
-      this.running = true;
-      this.jumpLoop();
+      this.applyPreset(0);
     } catch (error) {
       console.warn("Webcam access denied or unavailable:", error);
     }
   }
 
   public stop() {
-    this.running = false;
     if (this.videoElement?.srcObject) {
       const tracks = (this.videoElement.srcObject as MediaStream).getTracks();
       tracks.forEach((track) => track.stop());
@@ -44,66 +50,80 @@ export class WebcamAsset extends Container {
   }
 
   public resize(bounds: { width: number; height: number }) {
-    if (!this.sprite) return;
-    const targetWidth = bounds.width * compositionConfig.webcam.scale;
-    const scale = targetWidth / this.sprite.texture.width;
-    this.sprite.scale.set(scale);
-    this.moveToCorner(bounds, this.currentCornerIndex);
+    this.bounds = bounds;
+    if (this.sprite) {
+      const preset = webcamPresets[this.currentPresetIndex];
+      const w = webcamConfig.mask.width * preset.scale;
+      const h = webcamConfig.mask.height * preset.scale;
+      this.sprite.width = w;
+      this.sprite.height = h;
+    }
+    this.applyPreset(this.currentPresetIndex);
   }
 
-  private async jumpLoop() {
-    while (this.running) {
-      await waitFor(
-        randomFloat(
-          compositionConfig.webcam.jumpInterval.min,
-          compositionConfig.webcam.jumpInterval.max,
-        ),
-      );
-      if (!this.running) break;
+  public nextPreset() {
+    const next = (this.currentPresetIndex + 1) % webcamPresets.length;
+    this.applyPreset(next);
+  }
 
-      const corners = compositionConfig.webcam.corners.length;
-      let next = this.currentCornerIndex;
-      while (next === this.currentCornerIndex) {
-        next = Math.floor(Math.random() * corners);
-      }
-      this.currentCornerIndex = next;
-      this.moveToCorner(
-        {
-          width: this.parent?.width ?? 1920,
-          height: this.parent?.height ?? 1080,
-        },
-        this.currentCornerIndex,
-        true,
-      );
+  public jumpToRandomPreset() {
+    let next = this.currentPresetIndex;
+    while (next === this.currentPresetIndex) {
+      next = Math.floor(Math.random() * webcamPresets.length);
+    }
+    this.applyPreset(next);
+  }
+
+  private applyPreset(index: number) {
+    this.currentPresetIndex = index;
+    const preset = webcamPresets[index];
+    const w = webcamConfig.mask.width * preset.scale;
+    const h = webcamConfig.mask.height * preset.scale;
+    this.x = this.bounds.width * preset.x;
+    this.y = this.bounds.height * preset.y;
+
+    if (this.sprite) {
+      this.sprite.width = w;
+      this.sprite.height = h;
     }
   }
 
-  private moveToCorner(
-    bounds: { width: number; height: number },
-    cornerIndex: number,
-    animateMove = false,
-  ) {
-    if (!this.sprite) return;
-    const margin = compositionConfig.webcam.margin;
-    const w = this.sprite.width;
-    const h = this.sprite.height;
+  public update(ticker: Ticker) {
+    const dt = ticker.deltaMS / 1000;
+    this.idleTime += dt;
 
-    let x = margin + w * 0.5;
-    let y = margin + h * 0.5;
+    if (!this.sprite || !this.sprite.texture) return;
 
-    const corner = compositionConfig.webcam.corners[cornerIndex];
-    if (corner === "top-right" || corner === "bottom-right")
-      x = bounds.width - margin - w * 0.5;
-    if (corner === "bottom-left" || corner === "bottom-right")
-      y = bounds.height - margin - h * 0.5;
+    const maskCfg = webcamConfig.mask;
 
-    if (animateMove) {
-      animate(this, { x, y } as ObjectTarget<this>, {
-        duration: 0.8,
-        ease: "backOut",
-      });
-    } else {
-      this.position.set(x, y);
+    // organic breathing scale — multi-frequency sine waves
+    const breathe = Math.sin(this.idleTime * 0.6);
+    const breathe2 = Math.sin(this.idleTime * 0.4 + 1.3);
+    const breathe3 = Math.sin(this.idleTime * 0.25 + 2.7);
+
+    // subtle scale pulse — never resets to flat
+    const scaleRange =
+      (maskCfg.idleScalePulse.max - maskCfg.idleScalePulse.min) / 2;
+    const scaleMid =
+      (maskCfg.idleScalePulse.max + maskCfg.idleScalePulse.min) / 2;
+    const combinedBreath = breathe * 0.5 + breathe2 * 0.3 + breathe3 * 0.2;
+    this.scale.set(scaleMid + combinedBreath * scaleRange);
+
+    // gentle rotation — multi-frequency for organic feel
+    const rot1 = Math.sin(this.idleTime * 0.7) * maskCfg.idleRotationRange;
+    const rot2 =
+      Math.sin(this.idleTime * 0.35 + 1.8) * (maskCfg.idleRotationRange * 0.4);
+    this.rotation = ((rot1 + rot2) / 180) * Math.PI;
+
+    // auto-jump timer
+    this.autoJumpTimer += dt;
+    if (this.autoJumpTimer >= this.nextAutoJump) {
+      this.jumpToRandomPreset();
+      this.autoJumpTimer = 0;
+      this.nextAutoJump = randomFloat(
+        webcamConfig.autoJumpInterval.min,
+        webcamConfig.autoJumpInterval.max,
+      );
     }
   }
 }

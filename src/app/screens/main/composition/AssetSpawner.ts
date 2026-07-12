@@ -1,4 +1,4 @@
-import { Assets, Container, Sprite, Text, Texture, VideoSource } from "pixi.js";
+import { Assets, Container, Sprite, Texture, VideoSource } from "pixi.js";
 import { GifSprite } from "pixi.js/gif";
 import type { Ticker } from "pixi.js";
 
@@ -9,28 +9,30 @@ import manifest from "../../../../manifest.json";
 import { randomFloat } from "../../../../engine/utils/random";
 import { waitFor } from "../../../../engine/utils/waitFor";
 import { CompositionAsset } from "./CompositionAsset";
-import { compositionConfig } from "./composition.config";
+import { compositionConfig, type AnimationProfile } from "./composition.config";
 
-const SPAWNABLE_EXTENSIONS = [
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".webp",
-  ".svg",
-  ".gif",
-  ".mp4",
-  ".webm",
-  ".m4v",
-  ".ogv",
-  ".mov",
-];
+const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".svg"];
+const VIDEO_EXTENSIONS = [".mp4", ".webm", ".m4v", ".ogv", ".mov"];
+const GIF_EXTENSION = ".gif";
+
+type PoolEntry = {
+  key: string;
+  type: "image" | "video" | "gif";
+};
 
 export class AssetSpawner {
   private container: Container;
   private assets: CompositionAsset[] = [];
-  private pool: string[] = [];
+  private pool: PoolEntry[] = [];
   private paused = false;
   private running = false;
+
+  private readonly gridCols = 4;
+  private readonly gridRows = 3;
+  private occupiedCells = new Set<number>();
+  private assetCellMap = new Map<CompositionAsset, number>();
+  private blockedCell = -1;
+  private dyingAssets: CompositionAsset[] = [];
 
   constructor(container: Container) {
     this.container = container;
@@ -71,16 +73,38 @@ export class AssetSpawner {
     for (const asset of this.assets) {
       asset.dispose();
     }
+    for (const asset of this.dyingAssets) {
+      asset.dispose();
+    }
     this.assets = [];
+    this.dyingAssets = [];
   }
 
-  public update(ticker: Ticker, bounds: { width: number; height: number }) {
+  public update(
+    ticker: Ticker,
+    bounds: { width: number; height: number },
+    globalTime: number,
+  ) {
     for (let i = this.assets.length - 1; i >= 0; i--) {
       const asset = this.assets[i];
-      asset.update(ticker, bounds);
+      asset.update(ticker, bounds, globalTime);
       if (asset.isDead) {
+        const cellIdx = this.assetCellMap.get(asset);
+        if (cellIdx !== undefined) {
+          this.occupiedCells.delete(cellIdx);
+          this.assetCellMap.delete(asset);
+        }
         this.container.removeChild(asset.view);
         this.assets.splice(i, 1);
+      }
+    }
+
+    for (let i = this.dyingAssets.length - 1; i >= 0; i--) {
+      const asset = this.dyingAssets[i];
+      asset.update(ticker, bounds, globalTime);
+      if (asset.isDead) {
+        this.container.removeChild(asset.view);
+        this.dyingAssets.splice(i, 1);
       }
     }
   }
@@ -94,93 +118,124 @@ export class AssetSpawner {
       const srcs = Array.isArray(asset.src) ? asset.src : [asset.src];
       const firstSrc = srcs[0];
       const lower = firstSrc.toLowerCase();
+      const aliases = Array.isArray(asset.alias) ? asset.alias : [asset.alias];
+      const key = aliases[0] ?? firstSrc;
 
-      if (SPAWNABLE_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
-        const aliases = Array.isArray(asset.alias)
-          ? asset.alias
-          : [asset.alias];
-        const key = aliases[0] ?? firstSrc;
-        if (!seen.has(key)) {
-          seen.add(key);
-          this.pool.push(key);
-        }
+      if (seen.has(key)) continue;
+
+      // exclude background videos — they belong to BackgroundLayer only
+      if (key.startsWith("main/backgrounds/")) continue;
+
+      if (IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
+        seen.add(key);
+        this.pool.push({ key, type: "image" });
+      } else if (VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
+        seen.add(key);
+        this.pool.push({ key, type: "video" });
+      } else if (lower.endsWith(GIF_EXTENSION)) {
+        seen.add(key);
+        this.pool.push({ key, type: "gif" });
       }
     }
+  }
+
+  public setBlockedCell(cellIdx: number) {
+    this.blockedCell = cellIdx;
+  }
+
+  private pickGridCell(bounds: { width: number; height: number }): {
+    x: number;
+    y: number;
+    cellIdx: number;
+  } {
+    const freeCells: number[] = [];
+    for (let i = 0; i < this.gridCols * this.gridRows; i++) {
+      if (!this.occupiedCells.has(i) && i !== this.blockedCell)
+        freeCells.push(i);
+    }
+
+    const cellIdx =
+      freeCells.length > 0
+        ? freeCells[Math.floor(Math.random() * freeCells.length)]
+        : -1;
+
+    this.occupiedCells.add(cellIdx);
+
+    const padX = 350;
+    const padY = 350;
+    const areaW = Math.max(1, bounds.width - padX * 2);
+    const areaH = Math.max(1, bounds.height - padY * 2);
+    const col = cellIdx % this.gridCols;
+    const row = Math.floor(cellIdx / this.gridCols);
+    const cellW = areaW / this.gridCols;
+    const cellH = areaH / this.gridRows;
+
+    const x =
+      padX + cellW * col + cellW * 0.5 + (Math.random() - 0.5) * cellW * 0.4;
+    const y =
+      padY + cellH * row + cellH * 0.5 + (Math.random() - 0.5) * cellH * 0.4;
+
+    return { x, y, cellIdx };
   }
 
   private async spawn(bounds: { width: number; height: number }) {
     if (this.assets.length >= compositionConfig.maxAssets) {
       const oldest = this.assets.shift();
       if (oldest) {
-        oldest.dispose();
-        this.container.removeChild(oldest.view);
+        const cellIdx = this.assetCellMap.get(oldest);
+        if (cellIdx !== undefined) {
+          this.occupiedCells.delete(cellIdx);
+          this.assetCellMap.delete(oldest);
+        }
+        oldest.startDying();
+        this.dyingAssets.push(oldest);
       }
     }
 
-    const view = await this.createView();
+    const { view, profile } = await this.createView();
     if (!view) return;
 
-    const asset = new CompositionAsset(view, bounds);
+    const gridPos = this.pickGridCell(bounds);
+    const asset = new CompositionAsset(
+      view,
+      bounds,
+      profile,
+      gridPos.x,
+      gridPos.y,
+    );
+    this.assetCellMap.set(asset, gridPos.cellIdx);
     this.assets.push(asset);
     this.container.addChild(view);
   }
 
-  private async createView(): Promise<Container | undefined> {
-    const isText =
-      Math.random() < compositionConfig.textWeight || this.pool.length === 0;
+  private async createView(): Promise<{
+    view: Container;
+    profile: AnimationProfile;
+  }> {
+    const entry = this.pool[Math.floor(Math.random() * this.pool.length)];
 
-    if (isText) {
-      const phrase =
-        compositionConfig.textPhrases[
-          Math.floor(Math.random() * compositionConfig.textPhrases.length)
-        ];
-      const text = new Text({
-        text: phrase,
-        style: {
-          fontFamily: "Arial",
-          fontSize: 32 + Math.random() * 64,
-          fill: 0xffffff,
-          dropShadow: {
-            distance: 2,
-            blur: 2,
-            color: "#000000",
-            alpha: 0.5,
-          },
-        },
-      });
-      text.anchor.set(0.5);
-      return text;
-    }
-
-    const key = this.pool[Math.floor(Math.random() * this.pool.length)];
-    const lower = key.toLowerCase();
-
-    if (lower.endsWith(".gif")) {
-      const source = await Assets.load(key);
+    if (entry.type === "gif") {
+      const source = await Assets.load(entry.key);
       const gif = new GifSprite({ source, autoPlay: true });
       gif.anchor.set(0.5);
-      gif.scale.set(0.25 + Math.random() * 0.5);
-      return gif;
+      gif.scale.set(0.35 + Math.random() * 0.4);
+      return { view: gif, profile: "pop" };
     }
 
-    if (
-      [".mp4", ".webm", ".m4v", ".ogv", ".mov"].some((ext) =>
-        lower.endsWith(ext),
-      )
-    ) {
-      const texture = await Assets.load<Texture>(key);
+    if (entry.type === "video") {
+      const texture = await Assets.load<Texture>(entry.key);
       const source = texture.source as VideoSource;
       const videoElement = source.resource;
       videoElement.loop = true;
       videoElement?.play?.();
       const video = new Sprite({ texture, anchor: 0.5 });
-      video.scale.set(0.25 + Math.random() * 0.5);
-      return video;
+      video.scale.set(0.35 + Math.random() * 0.4);
+      return { view: video, profile: "gentle" };
     }
 
-    const texture = await Assets.load<Texture>(key);
+    const texture = await Assets.load<Texture>(entry.key);
     const sprite = new Sprite({ texture, anchor: 0.5 });
-    sprite.scale.set(0.25 + Math.random() * 0.5);
-    return sprite;
+    sprite.scale.set(0.35 + Math.random() * 0.4);
+    return { view: sprite, profile: "gentle" };
   }
 }
