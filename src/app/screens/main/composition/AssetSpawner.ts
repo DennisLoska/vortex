@@ -9,10 +9,7 @@ import manifest from "../../../../manifest.json";
 import { randomFloat } from "../../../../engine/utils/random";
 import { waitFor } from "../../../../engine/utils/waitFor";
 import { CompositionAsset } from "./CompositionAsset";
-import {
-  compositionConfig,
-  type AnimationProfile,
-} from "./composition.config";
+import { compositionConfig, type AnimationProfile } from "./composition.config";
 
 const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".svg"];
 const VIDEO_EXTENSIONS = [".mp4", ".webm", ".m4v", ".ogv", ".mov"];
@@ -119,9 +116,7 @@ export class AssetSpawner {
       const srcs = Array.isArray(asset.src) ? asset.src : [asset.src];
       const firstSrc = srcs[0];
       const lower = firstSrc.toLowerCase();
-      const aliases = Array.isArray(asset.alias)
-        ? asset.alias
-        : [asset.alias];
+      const aliases = Array.isArray(asset.alias) ? asset.alias : [asset.alias];
       const key = aliases[0] ?? firstSrc;
 
       if (seen.has(key)) continue;

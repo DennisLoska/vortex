@@ -1,10 +1,7 @@
 import type { Container, Ticker } from "pixi.js";
 
 import { randomFloat } from "../../../../engine/utils/random";
-import {
-  animationProfiles,
-  type AnimationProfile,
-} from "./composition.config";
+import { animationProfiles, type AnimationProfile } from "./composition.config";
 
 export class CompositionAsset {
   public view: Container;
@@ -39,9 +36,7 @@ export class CompositionAsset {
     this.startY = randomFloat(pad, Math.max(pad, bounds.height - pad));
     this.startScale = 0.25 + Math.random() * 0.5;
     this.startRotation =
-      (Math.random() - 0.5) *
-      2 *
-      (config.rotationRange * (Math.PI / 180));
+      (Math.random() - 0.5) * 2 * (config.rotationRange * (Math.PI / 180));
     this.driftAngle = Math.random() * Math.PI * 2;
     this.driftSpeed = randomFloat(config.driftSpeed.min, config.driftSpeed.max);
     this.scalePhase = Math.random() * Math.PI * 2;
