@@ -31,9 +31,9 @@ npm-debug.log*
 # AssetPack (PixiJS asset pipeline) generated files
 .assetpack/
 public/assets/
-public/texts/
 src/manifest.json
 
-# Source media assets (kept out of git; distribute separately)
-raw-assets/
+# Project media assets (kept out of git; distribute separately)
+projects/
+
 .oneshot-state
