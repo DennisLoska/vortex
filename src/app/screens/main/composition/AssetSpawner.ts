@@ -33,6 +33,11 @@ export class AssetSpawner {
   private paused = false;
   private running = false;
 
+  private readonly gridCols = 4;
+  private readonly gridRows = 3;
+  private occupiedCells = new Set<number>();
+  private assetCellMap = new Map<CompositionAsset, number>();
+
   constructor(container: Container) {
     this.container = container;
     this.buildPool();
@@ -85,6 +90,11 @@ export class AssetSpawner {
       const asset = this.assets[i];
       asset.update(ticker, bounds, globalTime);
       if (asset.isDead) {
+        const cellIdx = this.assetCellMap.get(asset);
+        if (cellIdx !== undefined) {
+          this.occupiedCells.delete(cellIdx);
+          this.assetCellMap.delete(asset);
+        }
         this.container.removeChild(asset.view);
         this.assets.splice(i, 1);
       }
@@ -135,10 +145,43 @@ export class AssetSpawner {
     }
   }
 
+  private pickGridCell(bounds: { width: number; height: number }): {
+    x: number;
+    y: number;
+    cellIdx: number;
+  } {
+    const freeCells: number[] = [];
+    for (let i = 0; i < this.gridCols * this.gridRows; i++) {
+      if (!this.occupiedCells.has(i)) freeCells.push(i);
+    }
+
+    const cellIdx =
+      freeCells.length > 0
+        ? freeCells[Math.floor(Math.random() * freeCells.length)]
+        : -1;
+
+    this.occupiedCells.add(cellIdx);
+
+    const col = cellIdx % this.gridCols;
+    const row = Math.floor(cellIdx / this.gridCols);
+    const cellW = bounds.width / this.gridCols;
+    const cellH = bounds.height / this.gridRows;
+
+    const x = cellW * col + cellW * 0.5 + (Math.random() - 0.5) * cellW * 0.4;
+    const y = cellH * row + cellH * 0.5 + (Math.random() - 0.5) * cellH * 0.4;
+
+    return { x, y, cellIdx };
+  }
+
   private async spawn(bounds: { width: number; height: number }) {
     if (this.assets.length >= compositionConfig.maxAssets) {
       const oldest = this.assets.shift();
       if (oldest) {
+        const cellIdx = this.assetCellMap.get(oldest);
+        if (cellIdx !== undefined) {
+          this.occupiedCells.delete(cellIdx);
+          this.assetCellMap.delete(oldest);
+        }
         oldest.dispose();
         this.container.removeChild(oldest.view);
       }
@@ -147,7 +190,15 @@ export class AssetSpawner {
     const { view, profile } = await this.createView(bounds);
     if (!view) return;
 
-    const asset = new CompositionAsset(view, bounds, profile);
+    const gridPos = this.pickGridCell(bounds);
+    const asset = new CompositionAsset(
+      view,
+      bounds,
+      profile,
+      gridPos.x,
+      gridPos.y,
+    );
+    this.assetCellMap.set(asset, gridPos.cellIdx);
     this.assets.push(asset);
     this.container.addChild(view);
   }

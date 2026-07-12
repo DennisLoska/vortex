@@ -23,6 +23,8 @@ export class CompositionAsset {
     view: Container,
     bounds: { width: number; height: number },
     profile: AnimationProfile,
+    startX?: number,
+    startY?: number,
   ) {
     this.view = view;
     this.profile = profile;
@@ -32,8 +34,9 @@ export class CompositionAsset {
     this.fadeDuration = config.fadeDuration;
 
     const pad = 100;
-    this.startX = randomFloat(pad, Math.max(pad, bounds.width - pad));
-    this.startY = randomFloat(pad, Math.max(pad, bounds.height - pad));
+    this.startX = startX ?? randomFloat(pad, Math.max(pad, bounds.width - pad));
+    this.startY =
+      startY ?? randomFloat(pad, Math.max(pad, bounds.height - pad));
     this.startScale = 0.25 + Math.random() * 0.5;
     this.startRotation =
       (Math.random() - 0.5) * 2 * (config.rotationRange * (Math.PI / 180));
