@@ -31,6 +31,7 @@ export class AssetSpawner {
   private readonly gridRows = 3;
   private occupiedCells = new Set<number>();
   private assetCellMap = new Map<CompositionAsset, number>();
+  private blockedCell = -1;
 
   constructor(container: Container) {
     this.container = container;
@@ -124,6 +125,10 @@ export class AssetSpawner {
     }
   }
 
+  public setBlockedCell(cellIdx: number) {
+    this.blockedCell = cellIdx;
+  }
+
   private pickGridCell(bounds: { width: number; height: number }): {
     x: number;
     y: number;
@@ -131,7 +136,8 @@ export class AssetSpawner {
   } {
     const freeCells: number[] = [];
     for (let i = 0; i < this.gridCols * this.gridRows; i++) {
-      if (!this.occupiedCells.has(i)) freeCells.push(i);
+      if (!this.occupiedCells.has(i) && i !== this.blockedCell)
+        freeCells.push(i);
     }
 
     const cellIdx =

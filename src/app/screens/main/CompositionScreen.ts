@@ -54,6 +54,16 @@ export class CompositionScreen extends Container {
     if (this.paused) return;
     const dt = ticker.deltaMS / 1000;
     this.globalTime += dt;
+
+    const textPos = this.textOverlay.textPosition;
+    if (textPos) {
+      const cellW = this.bounds.width / 4;
+      const cellH = this.bounds.height / 3;
+      const col = Math.floor(textPos.x / cellW);
+      const row = Math.floor(textPos.y / cellH);
+      this.spawner.setBlockedCell(row * 4 + col);
+    }
+
     this.spawner.update(ticker, this.bounds, this.globalTime);
     this.textOverlay.update(dt);
     this.webcam.update(ticker);

@@ -17,6 +17,12 @@ export class TextOverlay extends Container {
   private fadingOut = false;
   private boundsWidth = 1920;
   private boundsHeight = 1080;
+
+  public get textPosition(): { x: number; y: number } | null {
+    if (!this.currentText) return null;
+    return { x: this.currentText.x, y: this.currentText.y };
+  }
+
   public async loadPhrases() {
     const entries = Object.entries(textModules);
     if (entries.length === 0) return;

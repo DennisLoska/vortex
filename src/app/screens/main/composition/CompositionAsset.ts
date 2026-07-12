@@ -33,7 +33,7 @@ export class CompositionAsset {
     this.lifetime = randomFloat(config.lifetime.min, config.lifetime.max);
     this.fadeDuration = config.fadeDuration;
 
-    const pad = 250;
+    const pad = 350;
     this.startX = startX ?? randomFloat(pad, Math.max(pad, bounds.width - pad));
     this.startY =
       startY ?? randomFloat(pad, Math.max(pad, bounds.height - pad));
