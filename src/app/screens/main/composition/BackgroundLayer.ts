@@ -82,8 +82,17 @@ export class BackgroundLayer extends Container {
       }
 
       if (progress >= 1) {
-        // transition complete — swap roles
+        // before destroying the old sprite, ensure its video keeps looping
         const oldActive = this.activeSprite;
+        const oldSource = oldActive.texture.source as VideoSource | undefined;
+        const oldVideo = oldSource?.resource;
+        if (oldVideo) {
+          oldVideo.loop = true;
+          // restart from beginning in case it reached the end
+          oldVideo.currentTime = 0;
+          void oldVideo.play();
+        }
+
         this.removeChild(oldActive);
         oldActive.destroy();
 
@@ -99,8 +108,7 @@ export class BackgroundLayer extends Container {
         const video = source.resource;
         if (video) {
           video.loop = true;
-          video.currentTime = 0;
-          video.play();
+          void video.play();
         }
 
         // reset auto timer for next transition
@@ -130,8 +138,7 @@ export class BackgroundLayer extends Container {
     const video = source.resource;
     if (video) {
       video.loop = true;
-      video.currentTime = 0;
-      video.play();
+      void video.play();
     }
 
     this.transitioning = true;
@@ -156,8 +163,7 @@ export class BackgroundLayer extends Container {
     const video = source.resource;
     if (video) {
       video.loop = true;
-      video.currentTime = 0;
-      video.play();
+      void video.play();
     }
 
     this.transitioning = true;
