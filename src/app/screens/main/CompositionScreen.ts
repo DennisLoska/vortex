@@ -128,15 +128,14 @@ export class CompositionScreen extends Container {
     }
 
     // load all textures, pick one to start, then schedule auto-transitions
-    const textures: Texture[] = [];
+    const bgTextures: Texture[] = [];
     for (const key of bgKeys) {
       const texture = await Assets.load<Texture>(key);
-      textures.push(texture);
+      bgTextures.push(texture);
     }
 
-    if (textures.length > 0) {
-      // set the first one as active, then crossfade through the rest
-      await this.background.setMultipleBackgrounds(textures);
+    if (bgTextures.length > 0) {
+      await this.background.setMultipleBackgrounds();
     }
   }
 

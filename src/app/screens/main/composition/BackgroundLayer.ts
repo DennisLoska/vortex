@@ -1,5 +1,9 @@
 import { Container, Sprite, Texture } from "pixi.js";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - dynamically generated file by AssetPack
+import manifest from "../../../../manifest.json";
+
 export class BackgroundLayer extends Container {
   // Only ever two sprites: one active, one temporary for crossfade
   private activeSprite: Sprite | null = null;
@@ -27,19 +31,41 @@ export class BackgroundLayer extends Container {
     }
   }
 
-  public async setMultipleBackgrounds(textures: Texture[]) {
-    if (textures.length === 0) return;
+  public async setMultipleBackgrounds() {
+    // discover background video URLs from manifest
+    const urls: string[] = [];
+    for (const bundle of manifest.bundles) {
+      for (const asset of bundle.assets) {
+        const srcs = Array.isArray(asset.src) ? asset.src : [asset.src];
+        const firstSrc = srcs[0];
+        if (firstSrc.startsWith("main/backgrounds/")) {
+          // alias is the public path, e.g. "main/backgrounds/foo.mp4"
+          const aliases = Array.isArray(asset.alias)
+            ? asset.alias
+            : [asset.alias];
+          urls.push(aliases[0] ?? firstSrc);
+        }
+      }
+    }
 
-    // build persistent video elements for each texture
-    for (const tex of textures) {
+    if (urls.length === 0) return;
+
+    // build persistent video elements for each URL
+    for (const url of urls) {
       const video = document.createElement("video");
-      video.src = tex.source.resource?.src ?? "";
+      video.src = `/assets/${url}`;
       video.loop = true;
       video.muted = false;
       video.playsInline = true;
-      void video.play();
 
-      // create a fresh texture from the persistent video element
+      // wait for metadata before creating texture
+      await new Promise<void>((resolve) => {
+        video.addEventListener("loadedmetadata", () => resolve(), {
+          once: true,
+        });
+        video.load();
+      });
+
       const persistentTex = Texture.from(video);
       this.videos.push(video);
       this.textures.push(persistentTex);

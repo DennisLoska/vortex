@@ -35,16 +35,17 @@ export const animationProfiles: Record<AnimationProfile, ProfileConfig> = {
 export type WebcamPreset = { x: number; y: number; scale: number };
 
 export const webcamPresets: WebcamPreset[] = [
-  { x: 0.12, y: 0.12, scale: 1.0 },
-  { x: 0.65, y: 0.12, scale: 1.0 },
-  { x: 0.12, y: 0.65, scale: 1.0 },
+  { x: 0.16, y: 0.26, scale: 1.0 },
+  { x: 0.65, y: 0.2, scale: 1.0 },
+  { x: 0.16, y: 0.65, scale: 1.0 },
   { x: 0.65, y: 0.65, scale: 1.0 },
-  { x: 0.4, y: 0.12, scale: 1.0 },
+  { x: 0.4, y: 0.28, scale: 1.0 },
   { x: 0.4, y: 0.65, scale: 1.0 },
   { x: 0.12, y: 0.4, scale: 1.0 },
   { x: 0.65, y: 0.4, scale: 1.0 },
   { x: 0.4, y: 0.4, scale: 1.2 },
-  { x: 0.65, y: 0.65, scale: 0.8 },
+  { x: 0.85, y: 0.65, scale: 0.8 },
+  { x: 0.75, y: 0.65, scale: 1.2 },
 ];
 
 export const webcamConfig = {
