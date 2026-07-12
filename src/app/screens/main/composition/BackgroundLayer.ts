@@ -22,6 +22,7 @@ export class BackgroundLayer extends Container {
 
   private fadeInAlpha = 0;
   private needsFadeIn = false;
+  private blackOverlay: Sprite | null = null;
 
   private zoomData = new Map<Sprite, { baseScale: number; age: number }>();
   private readonly zoomRate = 0.003;
@@ -69,6 +70,19 @@ export class BackgroundLayer extends Container {
     });
     this.addChild(this.activeSprite);
     this.stretchToFill(this.activeSprite);
+
+    this.blackOverlay = new Sprite({
+      texture: Texture.WHITE,
+      anchor: 0.5,
+      tint: 0x000000,
+    });
+    this.blackOverlay.width = this.lastBounds.width;
+    this.blackOverlay.height = this.lastBounds.height;
+    this.blackOverlay.position.set(
+      this.lastBounds.width * 0.5,
+      this.lastBounds.height * 0.5,
+    );
+    this.addChild(this.blackOverlay);
 
     this.needsFadeIn = true;
     this.fadeInAlpha = 0;
@@ -146,6 +160,11 @@ export class BackgroundLayer extends Container {
     ) as Sprite[]) {
       this.rebaseSprite(sprite);
     }
+    if (this.blackOverlay) {
+      this.blackOverlay.width = width;
+      this.blackOverlay.height = height;
+      this.blackOverlay.position.set(width * 0.5, height * 0.5);
+    }
   }
 
   private rebaseSprite(sprite: Sprite) {
@@ -209,7 +228,15 @@ export class BackgroundLayer extends Container {
       this.applyZoom(this.activeSprite, safeDt);
       this.fadeInAlpha = Math.min(this.fadeInAlpha + safeDt / 2, 1);
       this.activeSprite.alpha = 1 - Math.pow(1 - this.fadeInAlpha, 5);
+      if (this.blackOverlay) {
+        this.blackOverlay.alpha = 1 - this.fadeInAlpha;
+      }
       if (this.fadeInAlpha >= 1) {
+        if (this.blackOverlay) {
+          this.removeChild(this.blackOverlay);
+          this.blackOverlay.destroy();
+          this.blackOverlay = null;
+        }
         this.needsFadeIn = false;
         this.autoTimer = 0;
         this.nextAutoDelay = 20;
