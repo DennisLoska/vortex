@@ -1,14 +1,84 @@
 import type { Ticker } from "pixi.js";
-import {
-  Container,
-  DisplacementFilter,
-  Sprite,
-  Texture,
-  VideoSource,
-} from "pixi.js";
+import { Container, Filter, Sprite, Texture, VideoSource } from "pixi.js";
 
 import { randomFloat } from "../../../../engine/utils/random";
 import { webcamConfig, webcamPresets } from "./composition.config";
+
+// Custom fragment shader: fluid displacement + radial alpha dissolve
+const vertexShader = `
+    in vec2 aPosition;
+    out vec2 vTextureCoord;
+    uniform vec4 uInputSize;
+    uniform vec4 uOutputFrame;
+
+    void main() {
+        vTextureCoord = filterTextureCoord(aPosition, uInputSize, uOutputFrame);
+        finalColor = texture(uTexture, vTextureCoord);
+    }
+`;
+
+const fragmentShader = `
+    in vec2 vTextureCoord;
+    out vec4 finalColor;
+    uniform sampler2D uTexture;
+    uniform float uTime;
+    uniform float uDisplacementScale;
+    uniform vec2 uResolution;
+
+    // simplex-ish 2D noise
+    vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+    vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+    vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
+
+    float snoise(vec2 v) {
+        const vec4 C = vec4(0.211324865405187,  // (3.0-sqrt(3.0))/6.0
+                            0.366025403784439,  // 0.5*(sqrt(3.0)-1.0)
+                           -0.577350269189626,  // -1.0 + 2.0 * C.x
+                            0.024390243902439); // 1.0 / 41.0
+        vec2 i  = floor(v + dot(v, C.yy));
+        vec2 x0 = v -   i + dot(i, C.xx);
+        vec2 i1;
+        i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+        vec4 x12 = x0.xyxy + C.xxzz;
+        x12.xy -= i1;
+        i = mod289(i);
+        vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0))
+            + i.x + vec3(0.0, i1.x, 1.0));
+        vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+        m = m*m ;
+        m = m*m ;
+        vec3 x = 2.0 * fract(p * C.www) - 1.0;
+        vec3 h = abs(x) - 0.5;
+        vec3 ox = floor(x + 0.5);
+        vec3 a0 = x - ox;
+        m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
+        vec3 g;
+        g.x  = a0.x  * x0.x  + h.x  * x0.y;
+        g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+        return 130.0 * dot(m, g);
+    }
+
+    void main() {
+        vec2 uv = vTextureCoord;
+        float aspect = uResolution.x / uResolution.y;
+
+        // --- fluid displacement via noise ---
+        float n1 = snoise(vec2(uv.x * 3.0 + uTime * 0.4, uv.y * 3.0 + uTime * 0.3));
+        float n2 = snoise(vec2(uv.x * 5.0 - uTime * 0.6, uv.y * 5.0 - uTime * 0.2));
+        vec2 displacement = vec2(n1, n2) * (uDisplacementScale / max(uResolution.x, uResolution.y)) * 2.0;
+
+        // --- radial alpha dissolve from center to edges ---
+        vec2 center = uv - 0.5;
+        float dist = length(center);
+        float edgeFade = 0.18; // how far from center the fade starts (normalized)
+        float alpha = 1.0 - smoothstep(1.0 - edgeFade, 1.0 + edgeFade * 0.3, dist);
+
+        // sample displaced UV for color
+        vec2 displacedUV = uv + displacement;
+        finalColor = texture(uTexture, displacedUV);
+        finalColor.a *= alpha;
+    }
+`;
 
 export class WebcamAsset extends Container {
   private videoElement: HTMLVideoElement | undefined;
@@ -22,9 +92,8 @@ export class WebcamAsset extends Container {
   );
   private idleTime = 0;
 
-  // displacement filter for fluid border warping
-  private displacementFilter: DisplacementFilter | null = null;
-  private displacementSprite: Sprite | undefined;
+  // custom filter combining displacement + alpha dissolve
+  private dissolveFilter: Filter | null = null;
 
   constructor() {
     super();
@@ -44,7 +113,7 @@ export class WebcamAsset extends Container {
       this.sprite = new Sprite({ texture, anchor: 0.5 });
       this.addChild(this.sprite);
       this.applyPreset(0);
-      this.buildDisplacementFilter();
+      this.buildDissolveFilter();
     } catch (error) {
       console.warn("Webcam access denied or unavailable:", error);
     }
@@ -99,64 +168,40 @@ export class WebcamAsset extends Container {
     }
   }
 
-  private buildDisplacementFilter() {
+  private buildDissolveFilter() {
     // destroy old filter
-    if (this.displacementFilter) {
+    if (this.dissolveFilter) {
       if (this.sprite && this.sprite.filters) {
         const filters = [...this.sprite.filters];
-        const idx = filters.indexOf(this.displacementFilter);
+        const idx = filters.indexOf(this.dissolveFilter);
         if (idx !== -1) {
           filters.splice(idx, 1);
           this.sprite.filters = filters;
         }
       }
-      this.displacementFilter.destroy();
-      this.displacementFilter = null;
+      this.dissolveFilter.destroy();
+      this.dissolveFilter = null;
     }
 
-    // destroy old displacement sprite
-    if (this.displacementSprite) {
-      this.removeChild(this.displacementSprite);
-      this.displacementSprite.destroy({ children: true });
-      this.displacementSprite = undefined;
-    }
-
-    // create an animated noise texture for displacement
-    const size = 256;
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext("2d")!;
-
-    // fill with mid-gray (neutral displacement)
-    ctx.fillStyle = "#808080";
-    ctx.fillRect(0, 0, size, size);
-
-    // add some noise pattern
-    const imageData = ctx.getImageData(0, 0, size, size);
-    for (let i = 0; i < imageData.data.length; i += 4) {
-      const noise = Math.random() * 30 - 15;
-      imageData.data[i] = Math.max(0, Math.min(255, 128 + noise));
-      imageData.data[i + 1] = Math.max(0, Math.min(255, 128 + noise));
-      imageData.data[i + 2] = 128;
-      imageData.data[i + 3] = 255;
-    }
-    ctx.putImageData(imageData, 0, 0);
-
-    const displacementTexture = Texture.from(canvas);
-    this.displacementSprite = new Sprite({ texture: displacementTexture });
-    // don't add to display list — it's only used by the filter
-
-    // create the displacement filter — scale controls distortion intensity
     const scale = webcamConfig.mask.displacementScale ?? 15;
-    this.displacementFilter = new DisplacementFilter({
-      sprite: this.displacementSprite!,
-      scale,
+
+    this.dissolveFilter = Filter.from({
+      gl: { vertex: vertexShader, fragment: fragmentShader },
+      resources: {
+        dissolveUniforms: {
+          uTime: { value: 0, type: "f32" },
+          uDisplacementScale: { value: scale, type: "f32" },
+          uResolution: {
+            value: new Float32Array([this.bounds.width, this.bounds.height]),
+            type: "vec2<f32>",
+          },
+        },
+      },
     });
 
     if (this.sprite) {
       const existingFilters = this.sprite.filters ?? [];
-      this.sprite.filters = [...existingFilters, this.displacementFilter];
+      this.sprite.filters = [...existingFilters, this.dissolveFilter];
     }
   }
 
@@ -166,38 +211,10 @@ export class WebcamAsset extends Container {
 
     if (!this.sprite || !this.sprite.texture) return;
 
-    // animate displacement texture for fluid border effect
-    if (this.displacementSprite && this.displacementFilter) {
-      const size = 256;
-      const canvas = this.displacementSprite.texture.source.resource as
-        HTMLCanvasElement | undefined;
-      if (canvas) {
-        const ctx = canvas.getContext("2d")!;
-        // generate animated noise using sine waves for smooth organic motion
-        const imageData = ctx.getImageData(0, 0, size, size);
-        const t = this.idleTime * 0.5;
-
-        for (let y = 0; y < size; y++) {
-          for (let x = 0; x < size; x++) {
-            const i = (y * size + x) * 4;
-            // multi-frequency sine noise for organic feel
-            const n1 = Math.sin(x * 0.05 + t) * Math.cos(y * 0.05 + t * 0.7);
-            const n2 = Math.sin((x + y) * 0.03 + t * 1.3) * 0.5;
-            const n3 =
-              Math.sin(x * 0.02 - t * 0.5) * Math.cos(y * 0.02 + t * 0.8) * 0.3;
-            const noise = (n1 + n2 + n3) * 40;
-
-            imageData.data[i] = Math.max(0, Math.min(255, 128 + noise));
-            imageData.data[i + 1] = Math.max(0, Math.min(255, 128 + noise));
-            imageData.data[i + 2] = 128;
-            imageData.data[i + 3] = 255;
-          }
-        }
-        ctx.putImageData(imageData, 0, 0);
-
-        // mark texture as dirty so PixiJS re-renders it
-        this.displacementSprite!.texture.source.update();
-      }
+    // update filter uniforms each frame
+    if (this.dissolveFilter) {
+      this.dissolveFilter.resources.dissolveUniforms.uniforms.uTime =
+        this.idleTime;
     }
 
     const maskCfg = webcamConfig.mask;
