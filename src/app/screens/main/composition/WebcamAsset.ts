@@ -1,3 +1,4 @@
+import type { Ticker } from "pixi.js";
 import { Container, Graphics, Sprite, Texture, VideoSource } from "pixi.js";
 
 import { randomFloat } from "../../../../engine/utils/random";
@@ -106,16 +107,19 @@ export class WebcamAsset extends Container {
     }
   }
 
-  public update(ticker: import("pixi.js").Ticker) {
+  public update(ticker: Ticker) {
     const dt = ticker.deltaMS / 1000;
     this.idleTime += dt;
 
     const maskCfg = webcamConfig.mask;
     const cycle = Math.sin((this.idleTime / maskCfg.idleCycle) * Math.PI * 2);
-    const scaleRange = (maskCfg.idleScalePulse.max - maskCfg.idleScalePulse.min) / 2;
-    const scaleMid = (maskCfg.idleScalePulse.max + maskCfg.idleScalePulse.min) / 2;
+    const scaleRange =
+      (maskCfg.idleScalePulse.max - maskCfg.idleScalePulse.min) / 2;
+    const scaleMid =
+      (maskCfg.idleScalePulse.max + maskCfg.idleScalePulse.min) / 2;
     this.maskGraphics.scale.set(scaleMid + cycle * scaleRange);
-    this.maskGraphics.rotation = cycle * maskCfg.idleRotationRange * (Math.PI / 180);
+    this.maskGraphics.rotation =
+      cycle * maskCfg.idleRotationRange * (Math.PI / 180);
 
     this.autoJumpTimer += dt;
     if (this.autoJumpTimer >= this.nextAutoJump) {

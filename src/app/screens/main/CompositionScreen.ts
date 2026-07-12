@@ -56,12 +56,12 @@ export class CompositionScreen extends Container {
     this.webcam.update(ticker);
   }
 
-  public pause() {
+  public async pause() {
     this.paused = true;
     this.spawner.pause();
   }
 
-  public resume() {
+  public async resume() {
     this.paused = false;
     this.spawner.resume();
   }
