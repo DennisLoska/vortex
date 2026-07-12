@@ -54,6 +54,29 @@ export class BackgroundLayer extends Container {
       }
     }
 
+    this.loadAllInBackground(videoUrls, imageUrls);
+
+    while (this.textures.length === 0) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+
+    this.currentIdx = 0;
+
+    this.activeSprite = new Sprite({
+      texture: this.textures[0],
+      anchor: 0.5,
+      alpha: 0,
+    });
+    this.addChild(this.activeSprite);
+    this.stretchToFill(this.activeSprite);
+
+    this.needsFadeIn = true;
+    this.fadeInAlpha = 0;
+    this.autoTimer = 0;
+    this.nextAutoDelay = 999;
+  }
+
+  private async loadAllInBackground(videoUrls: string[], imageUrls: string[]) {
     const timeout = (ms: number) =>
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("timeout")), ms),
@@ -105,7 +128,7 @@ export class BackgroundLayer extends Container {
           try {
             await loader(item);
           } catch {
-            console.warn(`Failed to load background asset`);
+            // individual failures don't stop the batch
           }
         }
       });
@@ -114,23 +137,6 @@ export class BackgroundLayer extends Container {
 
     await batchLoad(videoUrls, loadVideo);
     await batchLoad(imageUrls, loadImage);
-
-    if (this.textures.length === 0) return;
-
-    this.currentIdx = Math.floor(Math.random() * this.textures.length);
-
-    this.activeSprite = new Sprite({
-      texture: this.textures[this.currentIdx],
-      anchor: 0.5,
-      alpha: 0,
-    });
-    this.addChild(this.activeSprite);
-    this.stretchToFill(this.activeSprite);
-
-    this.needsFadeIn = true;
-    this.fadeInAlpha = 0;
-    this.autoTimer = 0;
-    this.nextAutoDelay = 999;
   }
 
   public resize(width: number, height: number) {
