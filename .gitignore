@@ -28,5 +28,7 @@ npm-debug.log*
 # TypeScript
 *.tsbuildinfo
 
-# Asset pack cache
-.cache-assetpack/
+# AssetPack (PixiJS asset pipeline) generated files
+.assetpack/
+public/assets/
+src/manifest.json
