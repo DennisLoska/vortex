@@ -1,4 +1,4 @@
-import { Container, Sprite, Texture, VideoSource } from "pixi.js";
+import { Container, Sprite, Texture } from "pixi.js";
 
 export class BackgroundLayer extends Container {
   // Only ever two sprites: one active, one temporary for crossfade
@@ -9,16 +9,13 @@ export class BackgroundLayer extends Container {
   private transitionDuration = 2.5;
   private transitionElapsed = 0;
 
-  // pool of loaded textures for cycling through backgrounds
-  private bgTextures: Texture[] = [];
-  private nextTextureIdx = 0;
+  // pool of persistent video elements — never destroyed by PixiJS
+  private videos: HTMLVideoElement[] = [];
+  private textures: Texture[] = [];
 
   // ticker-based timer for next transition (replaces setTimeout)
   private autoTimer = 0;
   private nextAutoDelay = 30 + Math.random() * 60; // seconds
-
-  // persistent video elements — kept alive outside PixiJS lifecycle
-  private videoElements: HTMLVideoElement[] = [];
 
   public async setBackground(texture: Texture) {
     if (!this.activeSprite) {
@@ -35,25 +32,34 @@ export class BackgroundLayer extends Container {
 
     // build persistent video elements for each texture
     for (const tex of textures) {
-      const source = tex.source as VideoSource;
-      const video = source.resource as HTMLVideoElement | undefined;
-      if (video && !this.videoElements.includes(video)) {
-        this.videoElements.push(video);
-      }
+      const video = document.createElement("video");
+      video.src = tex.source.resource?.src ?? "";
+      video.loop = true;
+      video.muted = false;
+      video.playsInline = true;
+      void video.play();
+
+      // create a fresh texture from the persistent video element
+      const persistentTex = Texture.from(video);
+      this.videos.push(video);
+      this.textures.push(persistentTex);
     }
 
-    this.bgTextures = textures;
-    this.nextTextureIdx = Math.floor(Math.random() * textures.length);
+    // pick a random starting index
+    const startIdx = Math.floor(Math.random() * this.textures.length);
 
-    // start with the first texture
-    const firstTex = textures[this.nextTextureIdx];
-    this.activeSprite = new Sprite({ texture: firstTex, anchor: 0.5 });
+    this.activeSprite = new Sprite({
+      texture: this.textures[startIdx],
+      anchor: 0.5,
+    });
     this.addChild(this.activeSprite);
     this.resize(this.lastBounds.width, this.lastBounds.height);
 
     // advance to next texture for the first auto-transition
-    this.nextTextureIdx = (this.nextTextureIdx + 1) % textures.length;
+    this.nextTextureIdx = (startIdx + 1) % this.textures.length;
   }
+
+  private nextTextureIdx = 0;
 
   public resize(width: number, height: number) {
     this.lastBounds = { width, height };
@@ -61,14 +67,10 @@ export class BackgroundLayer extends Container {
       Boolean,
     ) as Sprite[];
     for (const sprite of sprites) {
-      const texture = sprite.texture;
-      const isVideo = texture.source instanceof VideoSource;
-      if (isVideo) {
-        const video = (texture.source as VideoSource).resource;
-        video?.play?.();
-      }
-
-      const scale = Math.max(width / texture.width, height / texture.height);
+      const scale = Math.max(
+        width / sprite.texture.width,
+        height / sprite.texture.height,
+      );
       sprite.scale.set(scale);
       sprite.position.set(width * 0.5, height * 0.5);
     }
@@ -96,17 +98,13 @@ export class BackgroundLayer extends Container {
       if (progress >= 1) {
         // before destroying the old sprite, restart its video so it keeps looping
         const oldActive = this.activeSprite;
-        const oldSource = oldActive.texture.source as VideoSource | undefined;
-        const oldVideo = oldSource?.resource as HTMLVideoElement | undefined;
+        const oldVideo = this.getVideoForSprite(oldActive);
         if (oldVideo) {
-          oldVideo.loop = true;
           void oldVideo.play();
         }
 
         this.removeChild(oldActive);
-        // destroy sprite but NOT the underlying video element
-        // PixiJS Sprite.destroy() destroys children and texture — we need to prevent that
-        oldActive.texture?.source?.destroy();
+        // destroy only the sprite — NOT the underlying texture or video element
         oldActive.destroy({ children: false, texture: false });
 
         this.activeSprite = this.tempSprite!;
@@ -117,11 +115,9 @@ export class BackgroundLayer extends Container {
         this.transitionElapsed = 0;
 
         // ensure current video is playing and looping
-        const source = this.activeSprite!.texture.source as VideoSource;
-        const video = source.resource as HTMLVideoElement | undefined;
-        if (video) {
-          video.loop = true;
-          void video.play();
+        const curVideo = this.getVideoForSprite(this.activeSprite);
+        if (curVideo) {
+          void curVideo.play();
         }
 
         // reset auto timer for next transition
@@ -139,6 +135,17 @@ export class BackgroundLayer extends Container {
     }
   }
 
+  private getVideoForSprite(sprite: Sprite): HTMLVideoElement | undefined {
+    // find the video element whose texture matches this sprite's texture
+    for (const video of this.videos) {
+      const tex = Texture.from(video);
+      if (tex === sprite.texture || tex.source === sprite.texture?.source) {
+        return video;
+      }
+    }
+    return undefined;
+  }
+
   private async fadeToNew(texture: Texture) {
     if (this.transitioning) return;
 
@@ -147,10 +154,8 @@ export class BackgroundLayer extends Container {
     this.tempSprite = newSprite;
 
     // ensure the target video is playing and looping
-    const source = newSprite.texture.source as VideoSource;
-    const video = source.resource as HTMLVideoElement | undefined;
+    const video = this.getVideoForSprite(newSprite);
     if (video) {
-      video.loop = true;
       void video.play();
     }
 
@@ -161,10 +166,10 @@ export class BackgroundLayer extends Container {
 
   private transitionToNext() {
     if (this.activeSprite === null || this.transitioning) return;
-    if (this.bgTextures.length < 2) return;
+    if (this.textures.length < 2) return;
 
-    const nextTex = this.bgTextures[this.nextTextureIdx];
-    this.nextTextureIdx = (this.nextTextureIdx + 1) % this.bgTextures.length;
+    const nextTex = this.textures[this.nextTextureIdx];
+    this.nextTextureIdx = (this.nextTextureIdx + 1) % this.textures.length;
 
     // create a clone sprite for the incoming video
     const newSprite = new Sprite({ texture: nextTex, anchor: 0.5 });
@@ -172,10 +177,8 @@ export class BackgroundLayer extends Container {
     this.tempSprite = newSprite;
 
     // ensure the target video is playing and looping
-    const source = newSprite.texture.source as VideoSource;
-    const video = source.resource as HTMLVideoElement | undefined;
+    const video = this.getVideoForSprite(newSprite);
     if (video) {
-      video.loop = true;
       void video.play();
     }
 
