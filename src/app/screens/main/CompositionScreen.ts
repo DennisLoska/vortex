@@ -4,6 +4,7 @@ import { Container } from "pixi.js";
 import { engine } from "../../getEngine";
 import { AssetSpawner } from "./composition/AssetSpawner";
 import { BackgroundLayer } from "./composition/BackgroundLayer";
+import { TextOverlay } from "./composition/TextOverlay";
 import { WebcamAsset } from "./composition/WebcamAsset";
 
 export class CompositionScreen extends Container {
@@ -12,6 +13,7 @@ export class CompositionScreen extends Container {
   private background: BackgroundLayer;
   private assetLayer: Container;
   private spawner: AssetSpawner;
+  private textOverlay: TextOverlay;
   private webcam: WebcamAsset;
   private bounds = { width: 1920, height: 1080 };
   private paused = false;
@@ -28,6 +30,9 @@ export class CompositionScreen extends Container {
 
     this.spawner = new AssetSpawner(this.assetLayer);
 
+    this.textOverlay = new TextOverlay();
+    this.addChild(this.textOverlay);
+
     this.webcam = new WebcamAsset();
     this.addChild(this.webcam);
 
@@ -36,6 +41,7 @@ export class CompositionScreen extends Container {
 
   public async prepare() {
     await this.background.setMultipleBackgrounds();
+    await this.textOverlay.loadPhrases();
   }
 
   public async show() {
@@ -49,6 +55,7 @@ export class CompositionScreen extends Container {
     const dt = ticker.deltaMS / 1000;
     this.globalTime += dt;
     this.spawner.update(ticker, this.bounds, this.globalTime);
+    this.textOverlay.update(dt);
     this.webcam.update(ticker);
     this.background.update(dt);
   }
@@ -78,6 +85,7 @@ export class CompositionScreen extends Container {
   public resize(width: number, height: number) {
     this.bounds = { width, height };
     this.background.resize(width, height);
+    this.textOverlay.resize(width, height);
     this.webcam.resize(this.bounds);
   }
 
@@ -97,7 +105,11 @@ export class CompositionScreen extends Container {
       if (event.code === "KeyR") {
         this.reset();
       }
-      if (event.code === "KeyN") {
+      if (event.ctrlKey && event.code === "KeyN") {
+        event.preventDefault();
+        this.textOverlay.next();
+      }
+      if (event.code === "KeyN" && !event.ctrlKey) {
         this.webcam.nextPreset();
       }
     });

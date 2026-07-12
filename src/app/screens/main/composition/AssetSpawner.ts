@@ -1,4 +1,4 @@
-import { Assets, Container, Sprite, Text, Texture, VideoSource } from "pixi.js";
+import { Assets, Container, Sprite, Texture, VideoSource } from "pixi.js";
 import { GifSprite } from "pixi.js/gif";
 import type { Ticker } from "pixi.js";
 
@@ -20,16 +20,10 @@ type PoolEntry = {
   type: "image" | "video" | "gif";
 };
 
-const textModules = import.meta.glob("/public/texts/*.txt", {
-  query: "?raw",
-  import: "default",
-}) as Record<string, () => Promise<string>>;
-
 export class AssetSpawner {
   private container: Container;
   private assets: CompositionAsset[] = [];
   private pool: PoolEntry[] = [];
-  private phrases: string[] = [];
   private paused = false;
   private running = false;
 
@@ -48,7 +42,6 @@ export class AssetSpawner {
   }
 
   public async start(bounds: { width: number; height: number }) {
-    await this.loadPhrases();
     this.running = true;
     while (this.running) {
       if (!this.paused) {
@@ -99,20 +92,6 @@ export class AssetSpawner {
         this.assets.splice(i, 1);
       }
     }
-  }
-
-  private async loadPhrases() {
-    const entries = Object.entries(textModules);
-    if (entries.length === 0) return;
-
-    // each file is one phrase — preserve the entire content as-is
-    const loaded = await Promise.all(
-      entries.map(async ([, loader]) => {
-        const raw = await loader();
-        return raw.trimEnd();
-      }),
-    );
-    this.phrases = loaded.filter((p) => p.length > 0);
   }
 
   private buildPool() {
@@ -187,7 +166,7 @@ export class AssetSpawner {
       }
     }
 
-    const { view, profile } = await this.createView(bounds);
+    const { view, profile } = await this.createView();
     if (!view) return;
 
     const gridPos = this.pickGridCell(bounds);
@@ -203,59 +182,10 @@ export class AssetSpawner {
     this.container.addChild(view);
   }
 
-  private async createView(bounds: { width: number; height: number }): Promise<{
+  private async createView(): Promise<{
     view: Container;
     profile: AnimationProfile;
   }> {
-    const hasMedia = this.pool.length > 0;
-    const isText = !hasMedia || Math.random() < 0.25;
-
-    if (isText && this.phrases.length > 0) {
-      const phrase =
-        this.phrases[Math.floor(Math.random() * this.phrases.length)];
-
-      // measure text to pick appropriate font size and wrap width
-      const tempText = new Text({
-        text: phrase,
-        style: {
-          fontFamily: "Caveat, cursive",
-          fontSize: 48,
-          fill: 0xffffff,
-          wordWrap: true,
-          wordWrapWidth: bounds.width * 0.6,
-        },
-      });
-
-      const textHeight = tempText.height;
-      tempText.destroy();
-
-      // scale font so the whole block fits nicely on screen
-      const maxFontSize = Math.min(
-        96,
-        (bounds.height * 0.35) / Math.max(textHeight / 48, 1),
-      );
-      const fontSize = Math.max(28, maxFontSize);
-
-      const text = new Text({
-        text: phrase,
-        style: {
-          fontFamily: "Caveat, cursive",
-          fontSize: fontSize,
-          fill: 0xffffff,
-          wordWrap: true,
-          wordWrapWidth: bounds.width * 0.6,
-          dropShadow: {
-            distance: 2,
-            blur: 2,
-            color: "#000000",
-            alpha: 0.5,
-          },
-        },
-      });
-      text.anchor.set(0.5);
-      return { view: text, profile: "gentle" };
-    }
-
     const entry = this.pool[Math.floor(Math.random() * this.pool.length)];
 
     if (entry.type === "gif") {
