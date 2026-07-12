@@ -15,6 +15,8 @@ export class TextOverlay extends Container {
   private fadeElapsed = 0;
   private fadingIn = false;
   private fadingOut = false;
+  private boundsWidth = 1920;
+  private boundsHeight = 1080;
   public async loadPhrases() {
     const entries = Object.entries(textModules);
     if (entries.length === 0) return;
@@ -39,7 +41,7 @@ export class TextOverlay extends Container {
         fontSize: 48,
         fill: 0xffffff,
         wordWrap: true,
-        wordWrapWidth: this.width * 0.6,
+        wordWrapWidth: this.boundsWidth * 0.6,
         dropShadow: {
           distance: 2,
           blur: 2,
@@ -50,8 +52,8 @@ export class TextOverlay extends Container {
     });
     text.anchor.set(0.5);
     const pad = 80;
-    text.x = randomFloat(pad, Math.max(pad, this.width - pad));
-    text.y = randomFloat(pad, Math.max(pad, this.height - pad));
+    text.x = randomFloat(pad, Math.max(pad, this.boundsWidth - pad));
+    text.y = randomFloat(pad, Math.max(pad, this.boundsHeight - pad));
     text.alpha = 0;
     this.addChild(text);
     this.currentText = text;
@@ -105,8 +107,8 @@ export class TextOverlay extends Container {
   }
 
   public resize(width: number, height: number) {
-    this.width = width;
-    this.height = height;
+    this.boundsWidth = width;
+    this.boundsHeight = height;
 
     if (this.currentText) {
       this.currentText.style.wordWrapWidth = width * 0.6;
