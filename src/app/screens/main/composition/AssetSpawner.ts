@@ -95,16 +95,14 @@ export class AssetSpawner {
     const entries = Object.entries(textModules);
     if (entries.length === 0) return;
 
+    // each file is one phrase — preserve the entire content as-is
     const loaded = await Promise.all(
       entries.map(async ([, loader]) => {
         const raw = await loader();
-        return raw
-          .split(/\n\n+/)
-          .map((block) => block.trimEnd())
-          .filter((block) => block.length > 0);
+        return raw.trimEnd();
       }),
     );
-    this.phrases = loaded.flat();
+    this.phrases = loaded.filter((p) => p.length > 0);
   }
 
   private buildPool() {
@@ -146,7 +144,7 @@ export class AssetSpawner {
       }
     }
 
-    const { view, profile } = await this.createView();
+    const { view, profile } = await this.createView(bounds);
     if (!view) return;
 
     const asset = new CompositionAsset(view, bounds, profile);
@@ -154,7 +152,7 @@ export class AssetSpawner {
     this.container.addChild(view);
   }
 
-  private async createView(): Promise<{
+  private async createView(bounds: { width: number; height: number }): Promise<{
     view: Container;
     profile: AnimationProfile;
   }> {
@@ -164,12 +162,37 @@ export class AssetSpawner {
     if (isText && this.phrases.length > 0) {
       const phrase =
         this.phrases[Math.floor(Math.random() * this.phrases.length)];
+
+      // measure text to pick appropriate font size and wrap width
+      const tempText = new Text({
+        text: phrase,
+        style: {
+          fontFamily: "Caveat, cursive",
+          fontSize: 48,
+          fill: 0xffffff,
+          wordWrap: true,
+          wordWrapWidth: bounds.width * 0.6,
+        },
+      });
+
+      const textHeight = tempText.height;
+      tempText.destroy();
+
+      // scale font so the whole block fits nicely on screen
+      const maxFontSize = Math.min(
+        96,
+        (bounds.height * 0.35) / Math.max(textHeight / 48, 1),
+      );
+      const fontSize = Math.max(28, maxFontSize);
+
       const text = new Text({
         text: phrase,
         style: {
           fontFamily: "Caveat, cursive",
-          fontSize: 32 + Math.random() * 64,
+          fontSize: fontSize,
           fill: 0xffffff,
+          wordWrap: true,
+          wordWrapWidth: bounds.width * 0.6,
           dropShadow: {
             distance: 2,
             blur: 2,
