@@ -7,7 +7,6 @@ import { webcamConfig, webcamPresets } from "./composition.config";
 export class WebcamAsset extends Container {
   private videoElement: HTMLVideoElement | undefined;
   private sprite: Sprite | undefined;
-  private maskGraphics: Graphics;
   private currentPresetIndex = 0;
   private bounds = { width: 1920, height: 1080 };
   private autoJumpTimer = 0;
@@ -19,8 +18,6 @@ export class WebcamAsset extends Container {
 
   constructor() {
     super();
-    this.maskGraphics = new Graphics();
-    this.addChild(this.maskGraphics);
   }
 
   public async init() {
@@ -89,38 +86,66 @@ export class WebcamAsset extends Container {
       this.sprite.width = w;
       this.sprite.height = h;
     }
-    this.drawMask(w, h);
-  }
-
-  private drawMask(width: number, height: number) {
-    this.maskGraphics.clear();
-    this.maskGraphics.roundRect(
-      -width / 2,
-      -height / 2,
-      width,
-      height,
-      webcamConfig.mask.cornerRadius,
-    );
-    this.maskGraphics.fill(0xffffff);
-    if (this.sprite) {
-      this.sprite.mask = this.maskGraphics;
-    }
   }
 
   public update(ticker: Ticker) {
     const dt = ticker.deltaMS / 1000;
     this.idleTime += dt;
 
+    if (!this.sprite || !this.sprite.texture) return;
+
     const maskCfg = webcamConfig.mask;
-    const cycle = Math.sin((this.idleTime / maskCfg.idleCycle) * Math.PI * 2);
+    const w = this.sprite.width;
+
+    // organic breathing scale
+    const breathe = Math.sin(this.idleTime * 0.6);
+    const breathe2 = Math.sin(this.idleTime * 0.4 + 1.3);
+    const breathe3 = Math.sin(this.idleTime * 0.25 + 2.7);
+
+    // subtle scale pulse — never resets to flat
     const scaleRange =
       (maskCfg.idleScalePulse.max - maskCfg.idleScalePulse.min) / 2;
     const scaleMid =
       (maskCfg.idleScalePulse.max + maskCfg.idleScalePulse.min) / 2;
-    this.maskGraphics.scale.set(scaleMid + cycle * scaleRange);
-    this.maskGraphics.rotation =
-      cycle * maskCfg.idleRotationRange * (Math.PI / 180);
+    const combinedBreath = breathe * 0.5 + breathe2 * 0.3 + breathe3 * 0.2;
+    this.scale.set(scaleMid + combinedBreath * scaleRange);
 
+    // gentle rotation — multi-frequency for organic feel
+    const rot1 = Math.sin(this.idleTime * 0.7) * maskCfg.idleRotationRange;
+    const rot2 =
+      Math.sin(this.idleTime * 0.35 + 1.8) * (maskCfg.idleRotationRange * 0.4);
+    this.rotation = ((rot1 + rot2) / 180) * Math.PI;
+
+    // alpha falloff at edges — creates the smoky dissolve effect
+    const edgeFade = maskCfg.edgeFadeRadius ?? 60;
+    const halfW = w / 2;
+
+    if (this.sprite.mask) {
+      const oldMask = this.sprite.mask as import("pixi.js").Container;
+      this.removeChild(oldMask);
+      oldMask.destroy({ children: true });
+      this.sprite.mask = null;
+    }
+
+    // build a soft radial gradient mask using Graphics
+    const maskGraphics = new Graphics();
+    const cx = 0;
+    const cy = 0;
+
+    // draw a large circle that covers the sprite center, with soft falloff via overlapping circles
+    // outer ring — full opacity at center, fading to transparent at edges
+    for (let r = halfW + edgeFade; r > halfW - edgeFade; r -= 2) {
+      const t = (r - (halfW - edgeFade)) / (edgeFade * 2);
+      const alpha = Math.max(0, Math.min(1, t));
+      maskGraphics
+        .circle(cx, cy, r)
+        .fill({ color: `rgba(255,255,255,${alpha})` });
+    }
+
+    this.addChild(maskGraphics as import("pixi.js").Container);
+    this.sprite.mask = maskGraphics;
+
+    // auto-jump timer
     this.autoJumpTimer += dt;
     if (this.autoJumpTimer >= this.nextAutoJump) {
       this.jumpToRandomPreset();

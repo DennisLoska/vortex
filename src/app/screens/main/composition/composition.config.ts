@@ -56,6 +56,7 @@ export const webcamConfig = {
     idleScalePulse: { min: 0.92, max: 1.08 },
     idleRotationRange: 3,
     idleCycle: 5,
+    edgeFadeRadius: 60,
   },
 };
 
