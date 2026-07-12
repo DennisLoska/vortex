@@ -71,7 +71,7 @@ export class CompositionScreen extends Container {
       const avg = new Color([r / 255, g / 255, b / 255]).toNumber();
       this.themeFilter.reset();
       this.themeFilter.tint(avg);
-      this.themeFilter.alpha = 0.3;
+      this.themeFilter.alpha = 0.5;
     } catch {
       // extraction fails silently on some GPU/configs
     }
