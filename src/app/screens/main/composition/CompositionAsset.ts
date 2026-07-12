@@ -106,6 +106,10 @@ export class CompositionAsset {
     }
   }
 
+  public startDying() {
+    this.age = Math.max(this.age, this.lifetime - this.fadeDuration);
+  }
+
   public dispose() {
     if (this.disposed) return;
     this.disposed = true;

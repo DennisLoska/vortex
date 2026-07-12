@@ -32,6 +32,7 @@ export class AssetSpawner {
   private occupiedCells = new Set<number>();
   private assetCellMap = new Map<CompositionAsset, number>();
   private blockedCell = -1;
+  private dyingAssets: CompositionAsset[] = [];
 
   constructor(container: Container) {
     this.container = container;
@@ -72,7 +73,11 @@ export class AssetSpawner {
     for (const asset of this.assets) {
       asset.dispose();
     }
+    for (const asset of this.dyingAssets) {
+      asset.dispose();
+    }
     this.assets = [];
+    this.dyingAssets = [];
   }
 
   public update(
@@ -91,6 +96,15 @@ export class AssetSpawner {
         }
         this.container.removeChild(asset.view);
         this.assets.splice(i, 1);
+      }
+    }
+
+    for (let i = this.dyingAssets.length - 1; i >= 0; i--) {
+      const asset = this.dyingAssets[i];
+      asset.update(ticker, bounds, globalTime);
+      if (asset.isDead) {
+        this.container.removeChild(asset.view);
+        this.dyingAssets.splice(i, 1);
       }
     }
   }
@@ -173,8 +187,8 @@ export class AssetSpawner {
           this.occupiedCells.delete(cellIdx);
           this.assetCellMap.delete(oldest);
         }
-        oldest.dispose();
-        this.container.removeChild(oldest.view);
+        oldest.startDying();
+        this.dyingAssets.push(oldest);
       }
     }
 
