@@ -59,46 +59,61 @@ export class BackgroundLayer extends Container {
         setTimeout(() => reject(new Error("timeout")), ms),
       );
 
-    for (const url of videoUrls) {
-      try {
-        const video = document.createElement("video");
-        video.src = `/assets/${url}`;
-        video.loop = true;
-        video.muted = true;
-        video.playsInline = true;
+    const concurrency = 5;
 
-        await Promise.race([
-          new Promise<void>((resolve, reject) => {
-            video.addEventListener("loadedmetadata", () => resolve(), {
-              once: true,
-            });
-            video.addEventListener("error", () => reject(), { once: true });
-            video.load();
-          }),
-          timeout(8000),
-        ]);
+    const loadVideo = async (url: string) => {
+      const video = document.createElement("video");
+      video.src = `/assets/${url}`;
+      video.loop = true;
+      video.muted = true;
+      video.playsInline = true;
 
-        const tex = Texture.from(video);
-        this.videos.push(video);
-        this.textures.push(tex);
-        void video.play();
-      } catch {
-        console.warn(`Failed to load background video: ${url}`);
-      }
-    }
+      await Promise.race([
+        new Promise<void>((resolve, reject) => {
+          video.addEventListener("loadedmetadata", () => resolve(), {
+            once: true,
+          });
+          video.addEventListener("error", () => reject(), { once: true });
+          video.load();
+        }),
+        timeout(8000),
+      ]);
 
-    for (const path of imageUrls) {
-      try {
-        const url = `/assets/${path}`;
-        const img = new Image();
-        img.src = url;
-        await Promise.race([img.decode(), timeout(8000)]);
-        const tex = Texture.from(img);
-        this.textures.push(tex);
-      } catch {
-        console.warn(`Failed to load background image: ${path}`);
-      }
-    }
+      const tex = Texture.from(video);
+      this.videos.push(video);
+      this.textures.push(tex);
+      void video.play();
+    };
+
+    const loadImage = async (path: string) => {
+      const url = `/assets/${path}`;
+      const img = new Image();
+      img.src = url;
+      await Promise.race([img.decode(), timeout(8000)]);
+      const tex = Texture.from(img);
+      this.textures.push(tex);
+    };
+
+    const batchLoad = async <T>(
+      items: T[],
+      loader: (item: T) => Promise<void>,
+    ) => {
+      let idx = 0;
+      const workers = Array.from({ length: concurrency }, async () => {
+        while (idx < items.length) {
+          const item = items[idx++];
+          try {
+            await loader(item);
+          } catch {
+            console.warn(`Failed to load background asset`);
+          }
+        }
+      });
+      await Promise.all(workers);
+    };
+
+    await batchLoad(videoUrls, loadVideo);
+    await batchLoad(imageUrls, loadImage);
 
     if (this.textures.length === 0) return;
 
