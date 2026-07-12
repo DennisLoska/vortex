@@ -147,13 +147,19 @@ export class AssetSpawner {
 
     this.occupiedCells.add(cellIdx);
 
+    const padX = 350;
+    const padY = 350;
+    const areaW = Math.max(1, bounds.width - padX * 2);
+    const areaH = Math.max(1, bounds.height - padY * 2);
     const col = cellIdx % this.gridCols;
     const row = Math.floor(cellIdx / this.gridCols);
-    const cellW = bounds.width / this.gridCols;
-    const cellH = bounds.height / this.gridRows;
+    const cellW = areaW / this.gridCols;
+    const cellH = areaH / this.gridRows;
 
-    const x = cellW * col + cellW * 0.5 + (Math.random() - 0.5) * cellW * 0.4;
-    const y = cellH * row + cellH * 0.5 + (Math.random() - 0.5) * cellH * 0.4;
+    const x =
+      padX + cellW * col + cellW * 0.5 + (Math.random() - 0.5) * cellW * 0.4;
+    const y =
+      padY + cellH * row + cellH * 0.5 + (Math.random() - 0.5) * cellH * 0.4;
 
     return { x, y, cellIdx };
   }
