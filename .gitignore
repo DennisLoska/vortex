@@ -35,3 +35,4 @@ src/manifest.json
 
 # Source media assets (kept out of git; distribute separately)
 raw-assets/
+.oneshot-state
