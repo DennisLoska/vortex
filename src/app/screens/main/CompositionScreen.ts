@@ -60,12 +60,12 @@ export class CompositionScreen extends Container {
     this.spawner = new AssetSpawner(this.assetLayer);
     this.spawner.setProject(this.currentProject);
 
+    this.webcam = new WebcamAsset();
+    this.addChild(this.webcam);
+
     this.textOverlay = new TextOverlay();
     this.textOverlay.setProject(this.currentProject);
     this.addChild(this.textOverlay);
-
-    this.webcam = new WebcamAsset();
-    this.addChild(this.webcam);
 
     this.setupKeyboard();
 
@@ -73,12 +73,18 @@ export class CompositionScreen extends Container {
     this.webcam.filters = [this.themeFilter];
   }
 
+  private webcamInitialized = false;
+
   public async prepare() {
     await this.background.setMultipleBackgrounds(this.currentProject);
     this.background.onNewBackground = (texture) => {
       this.extractAndApplyTheme(texture);
     };
     await this.textOverlay.loadPhrases();
+    if (!this.webcamInitialized) {
+      await this.webcam.init();
+      this.webcamInitialized = true;
+    }
   }
 
   private extractAndApplyTheme(texture: Texture) {
@@ -108,10 +114,15 @@ export class CompositionScreen extends Container {
   }
 
   public async show() {
+    this.bounds = { width: window.innerWidth, height: window.innerHeight };
+    this.background.resize(this.bounds.width, this.bounds.height);
+    this.textOverlay.resize(this.bounds.width, this.bounds.height);
+    this.webcam.resize(this.bounds);
     engine().audio.bgm.play("main/sounds/bgm-main.mp3", { volume: 0.5 });
-    await this.webcam.init();
     this.spawner.start(this.bounds);
   }
+
+
 
   public update(ticker: Ticker) {
     if (this.paused) return;
@@ -166,7 +177,6 @@ export class CompositionScreen extends Container {
     this.paused = false;
     this.spawner.stop();
     this.spawner.clear();
-    this.webcam.stop();
   }
 
   private async switchProject(name: string) {
