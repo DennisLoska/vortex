@@ -207,8 +207,8 @@ export class BackgroundLayer extends Container {
     // --- initial fade-in (slow ramp from black) ---
     if (this.needsFadeIn && this.activeSprite !== null) {
       this.applyZoom(this.activeSprite, safeDt);
-      this.fadeInAlpha = Math.min(this.fadeInAlpha + safeDt / 4, 1);
-      this.activeSprite.alpha = 1 - Math.pow(1 - this.fadeInAlpha, 3);
+      this.fadeInAlpha = Math.min(this.fadeInAlpha + safeDt / 2, 1);
+      this.activeSprite.alpha = 1 - Math.pow(1 - this.fadeInAlpha, 5);
       if (this.fadeInAlpha >= 1) {
         this.needsFadeIn = false;
         this.autoTimer = 0;
