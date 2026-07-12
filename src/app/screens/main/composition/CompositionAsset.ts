@@ -49,7 +49,7 @@ export class CompositionAsset {
     view.y = this.startY;
     view.scale.set(this.startScale);
     view.rotation = this.startRotation;
-    view.alpha = 0;
+    view.alpha = this.fadeDuration === 0 ? 1 : 0;
   }
 
   public update(
@@ -90,7 +90,9 @@ export class CompositionAsset {
       this.view.rotation = this.startRotation + rotationRad;
     }
 
-    if (this.age < this.fadeDuration) {
+    if (this.fadeDuration === 0) {
+      // pop — instant, no fade
+    } else if (this.age < this.fadeDuration) {
       this.view.alpha = this.age / this.fadeDuration;
     } else if (this.age > this.lifetime - this.fadeDuration) {
       this.view.alpha = Math.max(

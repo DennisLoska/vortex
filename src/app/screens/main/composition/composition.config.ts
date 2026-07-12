@@ -1,4 +1,4 @@
-export type AnimationProfile = "gentle" | "lively" | "none";
+export type AnimationProfile = "gentle" | "lively" | "pop" | "none";
 
 export type ProfileConfig = {
   rotationRange: number;
@@ -22,6 +22,13 @@ export const animationProfiles: Record<AnimationProfile, ProfileConfig> = {
     scalePulse: { min: 0.93, max: 1.07 },
     lifetime: { min: 10, max: 16 },
     fadeDuration: 2.5,
+  },
+  pop: {
+    rotationRange: 0,
+    driftSpeed: { min: 0, max: 0 },
+    scalePulse: { min: 1, max: 1 },
+    lifetime: { min: 3, max: 6 },
+    fadeDuration: 0,
   },
   none: {
     rotationRange: 0,
@@ -65,9 +72,8 @@ export const webcamConfig = {
 };
 
 export const compositionConfig = {
-  spawnInterval: { min: 3, max: 5 },
+  spawnInterval: { min: 7, max: 12 },
   maxAssets: 3,
-  backgroundAssetName: "background",
 };
 
 export type CompositionConfig = typeof compositionConfig;

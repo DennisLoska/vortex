@@ -219,7 +219,7 @@ export class AssetSpawner {
       const gif = new GifSprite({ source, autoPlay: true });
       gif.anchor.set(0.5);
       gif.scale.set(0.35 + Math.random() * 0.4);
-      return { view: gif, profile: "lively" };
+      return { view: gif, profile: "pop" };
     }
 
     if (entry.type === "video") {
