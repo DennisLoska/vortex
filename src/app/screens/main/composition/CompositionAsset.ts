@@ -18,7 +18,10 @@ export class CompositionAsset {
 
   constructor(view: Container, bounds: { width: number; height: number }) {
     this.view = view;
-    this.view.position.set(randomFloat(0, bounds.width), randomFloat(0, bounds.height));
+    this.view.position.set(
+      randomFloat(0, bounds.width),
+      randomFloat(0, bounds.height),
+    );
     this.view.alpha = 0;
     this.lifetime =
       randomFloat(

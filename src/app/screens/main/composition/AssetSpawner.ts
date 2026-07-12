@@ -4,7 +4,7 @@ import type { Ticker } from "pixi.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore - dynamically generated file by AssetPack
-import manifest from "../../../manifest.json";
+import manifest from "../../../../manifest.json";
 
 import { randomFloat } from "../../../../engine/utils/random";
 import { waitFor } from "../../../../engine/utils/waitFor";
@@ -95,7 +95,9 @@ export class AssetSpawner {
         const lower = firstSrc.toLowerCase();
 
         if (SPAWNABLE_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
-          const aliases = Array.isArray(asset.alias) ? asset.alias : [asset.alias];
+          const aliases = Array.isArray(asset.alias)
+            ? asset.alias
+            : [asset.alias];
           const key = aliases[0] ?? firstSrc;
           if (!seen.has(key)) {
             seen.add(key);
@@ -124,11 +126,14 @@ export class AssetSpawner {
   }
 
   private async createView(): Promise<Container | undefined> {
-    const isText = Math.random() < compositionConfig.textWeight || this.pool.length === 0;
+    const isText =
+      Math.random() < compositionConfig.textWeight || this.pool.length === 0;
 
     if (isText) {
       const phrase =
-        compositionConfig.textPhrases[Math.floor(Math.random() * compositionConfig.textPhrases.length)];
+        compositionConfig.textPhrases[
+          Math.floor(Math.random() * compositionConfig.textPhrases.length)
+        ];
       const text = new Text({
         text: phrase,
         style: {
@@ -159,7 +164,9 @@ export class AssetSpawner {
     }
 
     if (
-      [".mp4", ".webm", ".m4v", ".ogv", ".mov"].some((ext) => lower.endsWith(ext))
+      [".mp4", ".webm", ".m4v", ".ogv", ".mov"].some((ext) =>
+        lower.endsWith(ext),
+      )
     ) {
       const texture = await Assets.load<Texture>(key);
       const source = texture.source as VideoSource;

@@ -68,7 +68,10 @@ export class WebcamAsset extends Container {
       }
       this.currentCornerIndex = next;
       this.moveToCorner(
-        { width: this.parent?.width ?? 1920, height: this.parent?.height ?? 1080 },
+        {
+          width: this.parent?.width ?? 1920,
+          height: this.parent?.height ?? 1080,
+        },
         this.currentCornerIndex,
         true,
       );
@@ -89,11 +92,16 @@ export class WebcamAsset extends Container {
     let y = margin + h * 0.5;
 
     const corner = compositionConfig.webcam.corners[cornerIndex];
-    if (corner === "top-right" || corner === "bottom-right") x = bounds.width - margin - w * 0.5;
-    if (corner === "bottom-left" || corner === "bottom-right") y = bounds.height - margin - h * 0.5;
+    if (corner === "top-right" || corner === "bottom-right")
+      x = bounds.width - margin - w * 0.5;
+    if (corner === "bottom-left" || corner === "bottom-right")
+      y = bounds.height - margin - h * 0.5;
 
     if (animateMove) {
-      animate(this, { x, y } as ObjectTarget<this>, { duration: 0.8, ease: "backOut" });
+      animate(this, { x, y } as ObjectTarget<this>, {
+        duration: 0.8,
+        ease: "backOut",
+      });
     } else {
       this.position.set(x, y);
     }
