@@ -16,7 +16,7 @@ export class WebcamAsset extends Container {
   );
   private idleTime = 0;
 
-  // cached mask dimensions so we only rebuild when size changes
+  // cached mask so we only rebuild when size changes (preset jump)
   private lastMaskW = -1;
   private lastMaskH = -1;
   private softMask: Graphics | null = null;
@@ -109,27 +109,37 @@ export class WebcamAsset extends Container {
       this.sprite.mask = null;
     }
 
-    // build an elliptical soft mask using a filled Graphics shape
-    // the key is to draw many overlapping ellipses with decreasing alpha
-    // from center outward, creating a smooth radial falloff on ALL sides
+    // build a rectangular soft-edge mask using overlapping filled rects
+    // with smoothstep alpha falloff from all four edges toward center.
+    // This creates a truly seamless dissolve — no hard corners or edges.
     const maskGraphics = new Graphics();
     const cx = 0;
     const cy = 0;
 
-    // use the larger dimension as the base radius for circular falloff
-    const maxDim = Math.max(w, h);
-    const edgeFade = (webcamConfig.mask.edgeFadeRadius ?? 60) * 1.5;
+    const edgeFade = webcamConfig.mask.edgeFadeRadius ?? 60;
 
-    // draw concentric ellipses from outside in with increasing alpha
-    for (let r = maxDim / 2 + edgeFade; r > maxDim / 2 - edgeFade; r -= 3) {
+    // draw from outside in: each rect is slightly smaller than the last,
+    // with increasing alpha. The result is a smooth gradient from transparent
+    // at the edges to fully opaque at center — covering ALL sides including corners.
+    for (
+      let d = Math.max(w, h) / 2 + edgeFade;
+      d > Math.max(w, h) / 2 - edgeFade;
+      d -= 2
+    ) {
       const t = Math.max(
         0,
-        Math.min(1, (r - (maxDim / 2 - edgeFade)) / (edgeFade * 2)),
+        Math.min(1, (d - (Math.max(w, h) / 2 - edgeFade)) / (edgeFade * 2)),
       );
-      // smooth easing for more organic feel
-      const eased = t * t * (3 - 2 * t); // smoothstep
+      // smoothstep for organic feel
+      const eased = t * t * (3 - 2 * t);
+
       maskGraphics
-        .ellipse(cx, cy, r * (w / maxDim), r * (h / maxDim))
+        .rect(
+          cx - d * (w / Math.max(w, h)),
+          cy - d * (h / Math.max(w, h)),
+          d * 2 * (w / Math.max(w, h)),
+          d * 2 * (h / Math.max(w, h)),
+        )
         .fill({ color: `rgba(255,255,255,${eased})` });
     }
 

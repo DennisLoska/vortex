@@ -64,9 +64,19 @@ export class BackgroundLayer extends Container {
         oldSprite.destroy();
         this.sprites.splice(this.currentIdx, 1);
 
-        // promote next to current
-        this.sprites[0].alpha = 1;
-        this.currentIdx = 0;
+        // promote next to current and remove it from the array
+        // (it was added as a temporary clone during transition)
+        if (this.nextSprite !== null && this.nextSprite !== undefined) {
+          const idx = this.sprites.indexOf(this.nextSprite!);
+          if (idx >= 0) {
+            this.sprites.splice(idx, 1);
+          }
+          this.removeChild(this.nextSprite!);
+          // keep it as the active sprite — attach to currentIdx slot
+          this.sprites.push(this.nextSprite!);
+        }
+
+        this.currentIdx = this.sprites.length - 1;
         this.transitioning = false;
         this.transitionElapsed = 0;
         this.nextSprite = null;
@@ -109,7 +119,6 @@ export class BackgroundLayer extends Container {
     const sourceTexture = this.sprites[targetIdx].texture;
     const newSprite = new Sprite({ texture: sourceTexture, anchor: 0.5 });
     this.addChild(newSprite);
-    this.sprites.push(newSprite);
     this.nextSprite = newSprite;
 
     // ensure the target video is playing
