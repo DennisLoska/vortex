@@ -38,7 +38,7 @@ export class TextOverlay extends Container {
       text: phrase,
       style: {
         fontFamily: "Caveat, cursive",
-        fontSize: 48,
+        fontSize: 32,
         fill: 0xffffff,
         wordWrap: true,
         wordWrapWidth: this.boundsWidth * 0.6,
