@@ -64,6 +64,37 @@ export class TextOverlay extends Container {
       },
     });
     text.anchor.set(0.5);
+    text.eventMode = "static";
+    text.cursor = "grab";
+
+    let dragging = false;
+    let dragOffset = { x: 0, y: 0 };
+
+    text.on("pointerdown", (e) => {
+      dragging = true;
+      text.cursor = "grabbing";
+      const parent = text.parent;
+      if (!parent) return;
+      const pos = parent.toLocal(e.global);
+      dragOffset = { x: text.x - pos.x, y: text.y - pos.y };
+    });
+
+    text.on("globalpointermove", (e) => {
+      if (!dragging) return;
+      const parent = text.parent;
+      if (!parent) return;
+      const pos = parent.toLocal(e.global);
+      text.x = pos.x + dragOffset.x;
+      text.y = pos.y + dragOffset.y;
+    });
+
+    const stopDrag = () => {
+      dragging = false;
+      text.cursor = "grab";
+    };
+    text.on("pointerup", stopDrag);
+    text.on("pointerupoutside", stopDrag);
+
     const halfW = text.width * 0.5;
     const halfH = text.height * 0.5;
     const padX = halfW + 40;
