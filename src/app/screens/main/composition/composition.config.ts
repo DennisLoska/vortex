@@ -60,12 +60,13 @@ export const webcamConfig = {
     idleRotationRange: 3,
     idleCycle: 5,
     edgeFadeRadius: 60,
+    displacementScale: 15,
   },
 };
 
 export const compositionConfig = {
-  spawnInterval: { min: 0.5, max: 1.5 },
-  maxAssets: 12,
+  spawnInterval: { min: 3, max: 5 },
+  maxAssets: 5,
   backgroundAssetName: "background",
 };
 

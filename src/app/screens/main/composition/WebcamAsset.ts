@@ -1,5 +1,11 @@
 import type { Ticker } from "pixi.js";
-import { Container, Graphics, Sprite, Texture, VideoSource } from "pixi.js";
+import {
+  Container,
+  DisplacementFilter,
+  Sprite,
+  Texture,
+  VideoSource,
+} from "pixi.js";
 
 import { randomFloat } from "../../../../engine/utils/random";
 import { webcamConfig, webcamPresets } from "./composition.config";
@@ -16,10 +22,9 @@ export class WebcamAsset extends Container {
   );
   private idleTime = 0;
 
-  // cached mask so we only rebuild when size changes (preset jump)
-  private lastMaskW = -1;
-  private lastMaskH = -1;
-  private softMask: Graphics | null = null;
+  // displacement filter for fluid border warping
+  private displacementFilter: DisplacementFilter | null = null;
+  private displacementSprite: Sprite | undefined;
 
   constructor() {
     super();
@@ -39,6 +44,7 @@ export class WebcamAsset extends Container {
       this.sprite = new Sprite({ texture, anchor: 0.5 });
       this.addChild(this.sprite);
       this.applyPreset(0);
+      this.buildDisplacementFilter();
     } catch (error) {
       console.warn("Webcam access denied or unavailable:", error);
     }
@@ -93,59 +99,65 @@ export class WebcamAsset extends Container {
     }
   }
 
-  private buildSoftMask(w: number, h: number) {
-    // destroy old mask graphics
-    if (this.softMask) {
-      const old = this.softMask;
-      this.removeChild(old);
-      old.destroy({ children: true });
-      this.softMask = null;
+  private buildDisplacementFilter() {
+    // destroy old filter
+    if (this.displacementFilter) {
+      if (this.sprite && this.sprite.filters) {
+        const filters = [...this.sprite.filters];
+        const idx = filters.indexOf(this.displacementFilter);
+        if (idx !== -1) {
+          filters.splice(idx, 1);
+          this.sprite.filters = filters;
+        }
+      }
+      this.displacementFilter.destroy();
+      this.displacementFilter = null;
     }
 
-    if (this.sprite?.mask) {
-      const old = this.sprite.mask as import("pixi.js").Container;
-      this.removeChild(old);
-      old.destroy({ children: true });
-      this.sprite.mask = null;
+    // destroy old displacement sprite
+    if (this.displacementSprite) {
+      this.removeChild(this.displacementSprite);
+      this.displacementSprite.destroy({ children: true });
+      this.displacementSprite = undefined;
     }
 
-    // build a rectangular soft-edge mask using overlapping filled rects
-    // with smoothstep alpha falloff from all four edges toward center.
-    // This creates a truly seamless dissolve — no hard corners or edges.
-    const maskGraphics = new Graphics();
-    const cx = 0;
-    const cy = 0;
+    // create an animated noise texture for displacement
+    const size = 256;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d")!;
 
-    const edgeFade = webcamConfig.mask.edgeFadeRadius ?? 60;
+    // fill with mid-gray (neutral displacement)
+    ctx.fillStyle = "#808080";
+    ctx.fillRect(0, 0, size, size);
 
-    // draw from outside in: each rect is slightly smaller than the last,
-    // with increasing alpha. The result is a smooth gradient from transparent
-    // at the edges to fully opaque at center — covering ALL sides including corners.
-    for (
-      let d = Math.max(w, h) / 2 + edgeFade;
-      d > Math.max(w, h) / 2 - edgeFade;
-      d -= 2
-    ) {
-      const t = Math.max(
-        0,
-        Math.min(1, (d - (Math.max(w, h) / 2 - edgeFade)) / (edgeFade * 2)),
-      );
-      // smoothstep for organic feel
-      const eased = t * t * (3 - 2 * t);
-
-      maskGraphics
-        .rect(
-          cx - d * (w / Math.max(w, h)),
-          cy - d * (h / Math.max(w, h)),
-          d * 2 * (w / Math.max(w, h)),
-          d * 2 * (h / Math.max(w, h)),
-        )
-        .fill({ color: `rgba(255,255,255,${eased})` });
+    // add some noise pattern
+    const imageData = ctx.getImageData(0, 0, size, size);
+    for (let i = 0; i < imageData.data.length; i += 4) {
+      const noise = Math.random() * 30 - 15;
+      imageData.data[i] = Math.max(0, Math.min(255, 128 + noise));
+      imageData.data[i + 1] = Math.max(0, Math.min(255, 128 + noise));
+      imageData.data[i + 2] = 128;
+      imageData.data[i + 3] = 255;
     }
+    ctx.putImageData(imageData, 0, 0);
 
-    this.addChild(maskGraphics);
-    this.softMask = maskGraphics;
-    this.sprite!.mask = maskGraphics;
+    const displacementTexture = Texture.from(canvas);
+    this.displacementSprite = new Sprite({ texture: displacementTexture });
+    // don't add to display list — it's only used by the filter
+
+    // create the displacement filter — scale controls distortion intensity
+    const scale = webcamConfig.mask.displacementScale ?? 15;
+    this.displacementFilter = new DisplacementFilter({
+      sprite: this.displacementSprite!,
+      scale,
+    });
+
+    if (this.sprite) {
+      const existingFilters = this.sprite.filters ?? [];
+      this.sprite.filters = [...existingFilters, this.displacementFilter];
+    }
   }
 
   public update(ticker: Ticker) {
@@ -154,14 +166,38 @@ export class WebcamAsset extends Container {
 
     if (!this.sprite || !this.sprite.texture) return;
 
-    const w = this.sprite.width;
-    const h = this.sprite.height;
+    // animate displacement texture for fluid border effect
+    if (this.displacementSprite && this.displacementFilter) {
+      const size = 256;
+      const canvas = this.displacementSprite.texture.source.resource as
+        HTMLCanvasElement | undefined;
+      if (canvas) {
+        const ctx = canvas.getContext("2d")!;
+        // generate animated noise using sine waves for smooth organic motion
+        const imageData = ctx.getImageData(0, 0, size, size);
+        const t = this.idleTime * 0.5;
 
-    // rebuild soft mask when size changes (preset jump)
-    if (w !== this.lastMaskW || h !== this.lastMaskH) {
-      this.buildSoftMask(w, h);
-      this.lastMaskW = w;
-      this.lastMaskH = h;
+        for (let y = 0; y < size; y++) {
+          for (let x = 0; x < size; x++) {
+            const i = (y * size + x) * 4;
+            // multi-frequency sine noise for organic feel
+            const n1 = Math.sin(x * 0.05 + t) * Math.cos(y * 0.05 + t * 0.7);
+            const n2 = Math.sin((x + y) * 0.03 + t * 1.3) * 0.5;
+            const n3 =
+              Math.sin(x * 0.02 - t * 0.5) * Math.cos(y * 0.02 + t * 0.8) * 0.3;
+            const noise = (n1 + n2 + n3) * 40;
+
+            imageData.data[i] = Math.max(0, Math.min(255, 128 + noise));
+            imageData.data[i + 1] = Math.max(0, Math.min(255, 128 + noise));
+            imageData.data[i + 2] = 128;
+            imageData.data[i + 3] = 255;
+          }
+        }
+        ctx.putImageData(imageData, 0, 0);
+
+        // mark texture as dirty so PixiJS re-renders it
+        this.displacementSprite!.texture.source.update();
+      }
     }
 
     const maskCfg = webcamConfig.mask;
