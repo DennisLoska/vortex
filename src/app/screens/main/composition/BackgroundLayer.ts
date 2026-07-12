@@ -16,7 +16,7 @@ export class BackgroundLayer extends Container {
   private textures: Texture[] = [];
 
   private autoTimer = 0;
-  private nextAutoDelay = 10;
+  private nextAutoDelay = 20;
 
   private currentIdx = 0;
 
@@ -212,7 +212,7 @@ export class BackgroundLayer extends Container {
       if (this.fadeInAlpha >= 1) {
         this.needsFadeIn = false;
         this.autoTimer = 0;
-        this.nextAutoDelay = 10;
+        this.nextAutoDelay = 20;
       }
       return;
     }
@@ -244,7 +244,7 @@ export class BackgroundLayer extends Container {
         this.transitioning = false;
         this.transitionElapsed = 0;
         this.autoTimer = 0;
-        this.nextAutoDelay = 10;
+        this.nextAutoDelay = 20;
       }
       return;
     }

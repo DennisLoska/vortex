@@ -13,14 +13,14 @@ export const animationProfiles: Record<AnimationProfile, ProfileConfig> = {
     rotationRange: 3,
     driftSpeed: { min: 5, max: 20 },
     scalePulse: { min: 0.97, max: 1.03 },
-    lifetime: { min: 8, max: 14 },
+    lifetime: { min: 16, max: 28 },
     fadeDuration: 0.8,
   },
   lively: {
     rotationRange: 8,
     driftSpeed: { min: 15, max: 40 },
     scalePulse: { min: 0.93, max: 1.07 },
-    lifetime: { min: 5, max: 8 },
+    lifetime: { min: 10, max: 16 },
     fadeDuration: 0.5,
   },
   none: {
