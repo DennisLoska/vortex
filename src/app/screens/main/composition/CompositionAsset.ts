@@ -33,7 +33,7 @@ export class CompositionAsset {
     this.lifetime = randomFloat(config.lifetime.min, config.lifetime.max);
     this.fadeDuration = config.fadeDuration;
 
-    const pad = 100;
+    const pad = 150;
     this.startX = startX ?? randomFloat(pad, Math.max(pad, bounds.width - pad));
     this.startY =
       startY ?? randomFloat(pad, Math.max(pad, bounds.height - pad));
@@ -54,7 +54,7 @@ export class CompositionAsset {
 
   public update(
     ticker: Ticker,
-    _bounds: { width: number; height: number },
+    bounds: { width: number; height: number },
     globalTime: number,
   ) {
     if (this.disposed) return;
@@ -67,8 +67,14 @@ export class CompositionAsset {
     if (config.driftSpeed.max > 0) {
       const driftX = Math.cos(this.driftAngle) * this.driftSpeed * this.age;
       const driftY = Math.sin(this.driftAngle) * this.driftSpeed * this.age;
-      this.view.x = this.startX + driftX;
-      this.view.y = this.startY + driftY;
+      this.view.x = Math.max(
+        50,
+        Math.min(bounds.width - 50, this.startX + driftX),
+      );
+      this.view.y = Math.max(
+        50,
+        Math.min(bounds.height - 50, this.startY + driftY),
+      );
     }
 
     if (config.scalePulse.max !== config.scalePulse.min) {
