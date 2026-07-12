@@ -1,10 +1,7 @@
 import type { Ticker } from "pixi.js";
-import { Assets, Container, Texture } from "pixi.js";
+import { Container } from "pixi.js";
 
 import { engine } from "../../getEngine";
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore - dynamically generated file by AssetPack
-import manifest from "../../../manifest.json";
 import { AssetSpawner } from "./composition/AssetSpawner";
 import { BackgroundLayer } from "./composition/BackgroundLayer";
 import { WebcamAsset } from "./composition/WebcamAsset";
@@ -38,7 +35,7 @@ export class CompositionScreen extends Container {
   }
 
   public async prepare() {
-    await this.setBackgrounds();
+    await this.background.setMultipleBackgrounds();
   }
 
   public async show() {
@@ -89,54 +86,6 @@ export class CompositionScreen extends Container {
     this.spawner.stop();
     this.spawner.clear();
     this.webcam.stop();
-  }
-
-  private async setBackgrounds() {
-    const bgKeys: string[] = [];
-
-    for (const bundle of manifest.bundles) {
-      for (const asset of bundle.assets) {
-        const srcs = Array.isArray(asset.src) ? asset.src : [asset.src];
-        const firstSrc = srcs[0];
-        const aliases = Array.isArray(asset.alias)
-          ? asset.alias
-          : [asset.alias];
-
-        // collect all background videos
-        if (firstSrc.startsWith("main/backgrounds/")) {
-          bgKeys.push(aliases[0] ?? firstSrc);
-        }
-      }
-    }
-
-    // fall back to any single image/video if no backgrounds found
-    if (bgKeys.length === 0) {
-      for (const bundle of manifest.bundles) {
-        for (const asset of bundle.assets) {
-          const srcs = Array.isArray(asset.src) ? asset.src : [asset.src];
-          const firstSrc = srcs[0];
-          const fallbackAliases = Array.isArray(asset.alias)
-            ? asset.alias
-            : [asset.alias];
-          const lower = firstSrc.toLowerCase();
-          if (lower.endsWith(".png") || lower.endsWith(".jpg")) {
-            bgKeys.push(fallbackAliases[0] ?? firstSrc);
-            break;
-          }
-        }
-      }
-    }
-
-    // load all textures, pick one to start, then schedule auto-transitions
-    const bgTextures: Texture[] = [];
-    for (const key of bgKeys) {
-      const texture = await Assets.load<Texture>(key);
-      bgTextures.push(texture);
-    }
-
-    if (bgTextures.length > 0) {
-      await this.background.setMultipleBackgrounds();
-    }
   }
 
   private setupKeyboard() {
