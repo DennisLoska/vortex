@@ -1,64 +1,100 @@
-import { animate } from "motion";
 import type { Container, Ticker } from "pixi.js";
 
 import { randomFloat } from "../../../../engine/utils/random";
-import { compositionConfig } from "./composition.config";
-import { DriftBehavior } from "./behaviors/drift";
-import { FloatBehavior } from "./behaviors/float";
-import { OrbitBehavior } from "./behaviors/orbit";
-import { PulseBehavior } from "./behaviors/pulse";
-import type { Behavior } from "./behaviors/types";
+import {
+  animationProfiles,
+  type AnimationProfile,
+} from "./composition.config";
 
 export class CompositionAsset {
   public view: Container;
-  private behavior: Behavior;
+  private profile: AnimationProfile;
   private lifetime: number;
   private age = 0;
+  private fadeDuration: number;
   private disposed = false;
-  private fadingOut = false;
+  private startX: number;
+  private startY: number;
+  private startScale: number;
+  private startRotation: number;
+  private driftAngle: number;
+  private driftSpeed: number;
+  private scalePhase: number;
+  private rotationPhase: number;
 
-  constructor(view: Container, bounds: { width: number; height: number }) {
+  constructor(
+    view: Container,
+    bounds: { width: number; height: number },
+    profile: AnimationProfile,
+  ) {
     this.view = view;
-    this.view.position.set(
-      randomFloat(0, bounds.width),
-      randomFloat(0, bounds.height),
-    );
-    this.view.alpha = 0;
-    this.lifetime =
-      randomFloat(
-        compositionConfig.assetLifetime.min,
-        compositionConfig.assetLifetime.max,
-      ) * 1000;
+    this.profile = profile;
 
-    const behaviorKey = this.pickBehavior();
-    switch (behaviorKey) {
-      case "float":
-        this.behavior = new FloatBehavior();
-        break;
-      case "drift":
-        this.behavior = new DriftBehavior();
-        break;
-      case "orbit":
-        this.behavior = new OrbitBehavior(bounds);
-        break;
-      case "pulse":
-        this.behavior = new PulseBehavior();
-        break;
-      default:
-        this.behavior = new FloatBehavior();
-    }
+    const config = animationProfiles[profile];
+    this.lifetime = randomFloat(config.lifetime.min, config.lifetime.max);
+    this.fadeDuration = config.fadeDuration;
 
-    animate(this.view, { alpha: 1 }, { duration: 0.4 });
+    const pad = 100;
+    this.startX = randomFloat(pad, Math.max(pad, bounds.width - pad));
+    this.startY = randomFloat(pad, Math.max(pad, bounds.height - pad));
+    this.startScale = 0.25 + Math.random() * 0.5;
+    this.startRotation =
+      (Math.random() - 0.5) *
+      2 *
+      (config.rotationRange * (Math.PI / 180));
+    this.driftAngle = Math.random() * Math.PI * 2;
+    this.driftSpeed = randomFloat(config.driftSpeed.min, config.driftSpeed.max);
+    this.scalePhase = Math.random() * Math.PI * 2;
+    this.rotationPhase = Math.random() * Math.PI * 2;
+
+    view.x = this.startX;
+    view.y = this.startY;
+    view.scale.set(this.startScale);
+    view.rotation = this.startRotation;
+    view.alpha = 0;
   }
 
-  public update(ticker: Ticker, bounds: { width: number; height: number }) {
+  public update(
+    ticker: Ticker,
+    _bounds: { width: number; height: number },
+    globalTime: number,
+  ) {
     if (this.disposed) return;
-    this.age += ticker.deltaMS;
-    this.behavior.update({ asset: this.view, bounds, ticker });
 
-    if (this.age >= this.lifetime - 1000 && !this.fadingOut) {
-      this.fadingOut = true;
-      animate(this.view, { alpha: 0 }, { duration: 0.5 });
+    const dt = ticker.deltaMS / 1000;
+    this.age += dt;
+
+    const config = animationProfiles[this.profile];
+
+    if (config.driftSpeed.max > 0) {
+      const driftX = Math.cos(this.driftAngle) * this.driftSpeed * this.age;
+      const driftY = Math.sin(this.driftAngle) * this.driftSpeed * this.age;
+      this.view.x = this.startX + driftX;
+      this.view.y = this.startY + driftY;
+    }
+
+    if (config.scalePulse.max !== config.scalePulse.min) {
+      const pulse = Math.sin(globalTime * 0.8 + this.scalePhase);
+      const range = (config.scalePulse.max - config.scalePulse.min) / 2;
+      const mid = (config.scalePulse.max + config.scalePulse.min) / 2;
+      this.view.scale.set(this.startScale * (mid + pulse * range));
+    }
+
+    if (config.rotationRange > 0) {
+      const wobble = Math.sin(globalTime * 0.5 + this.rotationPhase);
+      const rotationRad = wobble * config.rotationRange * (Math.PI / 180);
+      this.view.rotation = this.startRotation + rotationRad;
+    }
+
+    if (this.age < this.fadeDuration) {
+      this.view.alpha = this.age / this.fadeDuration;
+    } else if (this.age > this.lifetime - this.fadeDuration) {
+      this.view.alpha = Math.max(
+        0,
+        (this.lifetime - this.age) / this.fadeDuration,
+      );
+    } else {
+      this.view.alpha = 1;
     }
 
     if (this.age >= this.lifetime) {
@@ -69,26 +105,11 @@ export class CompositionAsset {
   public dispose() {
     if (this.disposed) return;
     this.disposed = true;
-    this.behavior.dispose?.();
+    this.view.removeFromParent();
     this.view.destroy({ children: true });
   }
 
   public get isDead() {
     return this.disposed;
-  }
-
-  private pickBehavior(): "float" | "drift" | "orbit" | "pulse" {
-    const weights = compositionConfig.behaviorWeights;
-    const total = weights.float + weights.drift + weights.orbit + weights.pulse;
-    const roll = Math.random() * total;
-    let cumulative = 0;
-
-    cumulative += weights.float;
-    if (roll < cumulative) return "float";
-    cumulative += weights.drift;
-    if (roll < cumulative) return "drift";
-    cumulative += weights.orbit;
-    if (roll < cumulative) return "orbit";
-    return "pulse";
   }
 }
