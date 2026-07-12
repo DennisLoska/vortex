@@ -32,6 +32,48 @@
 
 ---
 
+## Task 0: Curate demo assets
+
+**Files:**
+- Create: `raw-assets/main/background.*` (image or video)
+- Create: several `raw-assets/main/*.png` / `raw-assets/main/*.mp4` copied from `/home/dennis/work/silicon-seeds/content/`
+
+- [ ] **Step 1: Pick a small subset of demo assets**
+
+Copy from `/home/dennis/work/silicon-seeds/content/` into `raw-assets/main/`:
+- 1 background image named `background.png` or `background.mp4`
+- 5–10 images for random spawning
+- 3–5 short videos for random spawning
+
+Example commands (adjust file names as needed):
+
+```bash
+mkdir -p raw-assets/main
+# background
+cp /home/dennis/work/silicon-seeds/content/image/019ea248-2b39-7000-90e0-9be16f816281_00001_.png raw-assets/main/background.png
+# sample images
+cp /home/dennis/work/silicon-seeds/content/image/019ea248-2b39-7001-ae46-d630a51087f6_00001_.png raw-assets/main/demo-01.png
+cp /home/dennis/work/silicon-seeds/content/image/019ea248-2b39-7002-bd54-60bffcb42c45_00001_.png raw-assets/main/demo-02.png
+cp /home/dennis/work/silicon-seeds/content/image/019cbd73-cb04-7000-8206-bbdd38962b64_00001_.png raw-assets/main/demo-03.png
+cp /home/dennis/work/silicon-seeds/content/image/019cbd73-ba6f-7000-882d-1ed8b4aaf85b_00001_.png raw-assets/main/demo-04.png
+cp /home/dennis/work/silicon-seeds/content/image/019cbd73-bb40-7000-9acc-16136ac6d47b_00001_.png raw-assets/main/demo-05.png
+# sample videos
+cp /home/dennis/work/silicon-seeds/content/video/019ea248-c356-7000-b633-7a6463ac327b_00001_.mp4 raw-assets/main/demo-01.mp4
+cp /home/dennis/work/silicon-seeds/content/video/019ea249-0feb-7000-aad2-25c76a7c01ce_00001_.mp4 raw-assets/main/demo-02.mp4
+cp /home/dennis/work/silicon-seeds/content/video/019ea249-581a-7000-9215-52787d01c1b4_00001_.mp4 raw-assets/main/demo-03.mp4
+```
+
+- [ ] **Step 2: Regenerate AssetPack manifest**
+
+Run: `npm run build`
+Expected: `src/manifest.json` is regenerated and includes the new assets.
+
+- [ ] **Step 3: Note on git**
+
+`raw-assets/` is currently ignored, so these demo assets stay local and are not committed. They will be processed by AssetPack into `public/assets/` and `src/manifest.json` when you run `npm run build` or `npm run dev`.
+
+---
+
 ## Task 1: Add composition configuration
 
 **Files:**
