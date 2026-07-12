@@ -32,3 +32,6 @@ npm-debug.log*
 .assetpack/
 public/assets/
 src/manifest.json
+
+# Source media assets (kept out of git; distribute separately)
+raw-assets/
