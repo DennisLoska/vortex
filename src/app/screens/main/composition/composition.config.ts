@@ -35,16 +35,16 @@ export const animationProfiles: Record<AnimationProfile, ProfileConfig> = {
 export type WebcamPreset = { x: number; y: number; scale: number };
 
 export const webcamPresets: WebcamPreset[] = [
-  { x: 0.05, y: 0.05, scale: 1.0 },
-  { x: 0.75, y: 0.05, scale: 1.0 },
-  { x: 0.05, y: 0.75, scale: 1.0 },
-  { x: 0.75, y: 0.75, scale: 1.0 },
-  { x: 0.4, y: 0.05, scale: 1.0 },
-  { x: 0.4, y: 0.75, scale: 1.0 },
-  { x: 0.05, y: 0.4, scale: 1.0 },
-  { x: 0.75, y: 0.4, scale: 1.0 },
+  { x: 0.12, y: 0.12, scale: 1.0 },
+  { x: 0.65, y: 0.12, scale: 1.0 },
+  { x: 0.12, y: 0.65, scale: 1.0 },
+  { x: 0.65, y: 0.65, scale: 1.0 },
+  { x: 0.4, y: 0.12, scale: 1.0 },
+  { x: 0.4, y: 0.65, scale: 1.0 },
+  { x: 0.12, y: 0.4, scale: 1.0 },
+  { x: 0.65, y: 0.4, scale: 1.0 },
   { x: 0.4, y: 0.4, scale: 1.2 },
-  { x: 0.75, y: 0.75, scale: 0.8 },
+  { x: 0.65, y: 0.65, scale: 0.8 },
 ];
 
 export const webcamConfig = {
@@ -53,9 +53,9 @@ export const webcamConfig = {
     cornerRadius: 24,
     width: 480,
     height: 360,
-    idleScalePulse: { min: 0.97, max: 1.03 },
-    idleRotationRange: 1,
-    idleCycle: 4,
+    idleScalePulse: { min: 0.92, max: 1.08 },
+    idleRotationRange: 3,
+    idleCycle: 5,
   },
 };
 
