@@ -23,6 +23,9 @@ export class BackgroundLayer extends Container {
   private fadeInAlpha = 0;
   private needsFadeIn = false;
 
+  private zoomData = new Map<Sprite, { baseScale: number; age: number }>();
+  private readonly zoomRate = 0.003;
+
   public async setMultipleBackgrounds() {
     const videoUrls: string[] = [];
     const imageUrls: string[] = [];
@@ -120,13 +123,57 @@ export class BackgroundLayer extends Container {
     for (const sprite of [this.activeSprite, this.tempSprite].filter(
       Boolean,
     ) as Sprite[]) {
-      this.stretchToFill(sprite);
+      this.rebaseSprite(sprite);
     }
   }
 
+  private rebaseSprite(sprite: Sprite) {
+    const texW = sprite.texture.width;
+    const texH = sprite.texture.height;
+    if (texW === 0 || texH === 0) return;
+
+    const baseScale = Math.max(
+      this.lastBounds.width / texW,
+      this.lastBounds.height / texH,
+    );
+
+    const data = this.zoomData.get(sprite);
+    const age = data?.age ?? 0;
+    this.zoomData.set(sprite, { baseScale, age });
+
+    const zoom = 1 + age * this.zoomRate;
+    sprite.scale.set(baseScale * zoom);
+    sprite.position.set(
+      this.lastBounds.width * 0.5,
+      this.lastBounds.height * 0.5,
+    );
+  }
+
   private stretchToFill(sprite: Sprite) {
-    sprite.width = this.lastBounds.width;
-    sprite.height = this.lastBounds.height;
+    const texW = sprite.texture.width;
+    const texH = sprite.texture.height;
+    if (texW === 0 || texH === 0) return;
+
+    const baseScale = Math.max(
+      this.lastBounds.width / texW,
+      this.lastBounds.height / texH,
+    );
+
+    this.zoomData.set(sprite, { baseScale, age: 0 });
+    sprite.scale.set(baseScale);
+    sprite.position.set(
+      this.lastBounds.width * 0.5,
+      this.lastBounds.height * 0.5,
+    );
+  }
+
+  private applyZoom(sprite: Sprite, dt: number) {
+    const data = this.zoomData.get(sprite);
+    if (!data) return;
+
+    data.age += dt;
+    const zoom = 1 + data.age * this.zoomRate;
+    sprite.scale.set(data.baseScale * zoom);
     sprite.position.set(
       this.lastBounds.width * 0.5,
       this.lastBounds.height * 0.5,
@@ -138,6 +185,7 @@ export class BackgroundLayer extends Container {
 
     // --- initial fade-in (slow ramp from black) ---
     if (this.needsFadeIn && this.activeSprite !== null) {
+      this.applyZoom(this.activeSprite, safeDt);
       this.fadeInAlpha = Math.min(this.fadeInAlpha + safeDt / 4, 1);
       this.activeSprite.alpha = 1 - Math.pow(1 - this.fadeInAlpha, 3);
       if (this.fadeInAlpha >= 1) {
@@ -150,6 +198,9 @@ export class BackgroundLayer extends Container {
 
     // --- crossfade transition ---
     if (this.transitioning && this.activeSprite !== null) {
+      this.applyZoom(this.activeSprite, safeDt);
+      if (this.tempSprite) this.applyZoom(this.tempSprite, safeDt);
+
       this.transitionElapsed += safeDt;
       const t = Math.min(this.transitionElapsed / this.transitionDuration, 1);
       const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
@@ -162,6 +213,7 @@ export class BackgroundLayer extends Container {
         const oldVideo = this.getVideoForSprite(old);
         if (oldVideo) void oldVideo.play();
 
+        this.zoomData.delete(old);
         this.removeChild(old);
         old.destroy({ children: false, texture: false });
 
@@ -179,6 +231,7 @@ export class BackgroundLayer extends Container {
     // --- auto-timer for next random transition ---
     if (this.textures.length < 2 || this.activeSprite === null) return;
 
+    this.applyZoom(this.activeSprite, safeDt);
     this.autoTimer += safeDt;
     if (this.autoTimer >= this.nextAutoDelay) {
       this.transitionToRandom();
