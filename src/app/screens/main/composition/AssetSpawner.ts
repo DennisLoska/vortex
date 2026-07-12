@@ -121,6 +121,9 @@ export class AssetSpawner {
 
       if (seen.has(key)) continue;
 
+      // exclude background videos — they belong to BackgroundLayer only
+      if (key.startsWith("main/backgrounds/")) continue;
+
       if (IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
         seen.add(key);
         this.pool.push({ key, type: "image" });

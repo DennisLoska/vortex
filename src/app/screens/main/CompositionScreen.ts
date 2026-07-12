@@ -7,7 +7,6 @@ import { engine } from "../../getEngine";
 import manifest from "../../../manifest.json";
 import { AssetSpawner } from "./composition/AssetSpawner";
 import { BackgroundLayer } from "./composition/BackgroundLayer";
-import { compositionConfig } from "./composition/composition.config";
 import { WebcamAsset } from "./composition/WebcamAsset";
 
 export class CompositionScreen extends Container {
@@ -39,7 +38,7 @@ export class CompositionScreen extends Container {
   }
 
   public async prepare() {
-    await this.setBackground();
+    await this.setBackgrounds();
   }
 
   public async show() {
@@ -54,6 +53,7 @@ export class CompositionScreen extends Container {
     this.globalTime += dt;
     this.spawner.update(ticker, this.bounds, this.globalTime);
     this.webcam.update(ticker);
+    this.background.update(dt);
   }
 
   public async pause() {
@@ -91,8 +91,8 @@ export class CompositionScreen extends Container {
     this.webcam.stop();
   }
 
-  private async setBackground() {
-    let backgroundKey: string | undefined;
+  private async setBackgrounds() {
+    const bgKeys: string[] = [];
 
     for (const bundle of manifest.bundles) {
       for (const asset of bundle.assets) {
@@ -101,45 +101,40 @@ export class CompositionScreen extends Container {
         const aliases = Array.isArray(asset.alias)
           ? asset.alias
           : [asset.alias];
-        const name = firstSrc.split("/").pop()?.split(".")[0] ?? "";
 
-        if (name === compositionConfig.backgroundAssetName) {
-          backgroundKey = aliases[0] ?? firstSrc;
-          break;
+        // collect all background videos
+        if (firstSrc.startsWith("main/backgrounds/")) {
+          bgKeys.push(aliases[0] ?? firstSrc);
         }
       }
-      if (backgroundKey) break;
     }
 
-    if (!backgroundKey) {
+    // fall back to any single image/video if no backgrounds found
+    if (bgKeys.length === 0) {
       for (const bundle of manifest.bundles) {
         for (const asset of bundle.assets) {
           const srcs = Array.isArray(asset.src) ? asset.src : [asset.src];
           const firstSrc = srcs[0];
-          const lower = firstSrc.toLowerCase();
-          const aliases = Array.isArray(asset.alias)
+          const fallbackAliases = Array.isArray(asset.alias)
             ? asset.alias
             : [asset.alias];
-          if (
-            lower.endsWith(".png") ||
-            lower.endsWith(".jpg") ||
-            lower.endsWith(".jpeg") ||
-            lower.endsWith(".webp") ||
-            lower.endsWith(".svg") ||
-            lower.endsWith(".mp4") ||
-            lower.endsWith(".webm")
-          ) {
-            backgroundKey = aliases[0] ?? firstSrc;
+          const lower = firstSrc.toLowerCase();
+          if (lower.endsWith(".png") || lower.endsWith(".jpg")) {
+            bgKeys.push(fallbackAliases[0] ?? firstSrc);
             break;
           }
         }
-        if (backgroundKey) break;
       }
     }
 
-    if (backgroundKey) {
-      const texture = await Assets.load<Texture>(backgroundKey);
+    // load all and pick one to start, then schedule transitions
+    for (const key of bgKeys) {
+      const texture = await Assets.load<Texture>(key);
       await this.background.setBackground(texture);
+    }
+
+    if (bgKeys.length > 0) {
+      this.background.transitionToRandom();
     }
   }
 
