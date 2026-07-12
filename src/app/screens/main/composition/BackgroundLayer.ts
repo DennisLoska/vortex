@@ -98,6 +98,7 @@ export class BackgroundLayer extends Container {
         const source = this.activeSprite!.texture.source as VideoSource;
         const video = source.resource;
         if (video) {
+          video.loop = true;
           video.currentTime = 0;
           video.play();
         }
@@ -128,6 +129,7 @@ export class BackgroundLayer extends Container {
     const source = newSprite.texture.source as VideoSource;
     const video = source.resource;
     if (video) {
+      video.loop = true;
       video.currentTime = 0;
       video.play();
     }
@@ -153,6 +155,7 @@ export class BackgroundLayer extends Container {
     const source = newSprite.texture.source as VideoSource;
     const video = source.resource;
     if (video) {
+      video.loop = true;
       video.currentTime = 0;
       video.play();
     }
