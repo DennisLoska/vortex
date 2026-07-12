@@ -17,6 +17,9 @@ export class BackgroundLayer extends Container {
   private autoTimer = 0;
   private nextAutoDelay = 30 + Math.random() * 60; // seconds
 
+  // persistent video elements — kept alive outside PixiJS lifecycle
+  private videoElements: HTMLVideoElement[] = [];
+
   public async setBackground(texture: Texture) {
     if (!this.activeSprite) {
       this.activeSprite = new Sprite({ texture, anchor: 0.5 });
@@ -29,6 +32,15 @@ export class BackgroundLayer extends Container {
 
   public async setMultipleBackgrounds(textures: Texture[]) {
     if (textures.length === 0) return;
+
+    // build persistent video elements for each texture
+    for (const tex of textures) {
+      const source = tex.source as VideoSource;
+      const video = source.resource as HTMLVideoElement | undefined;
+      if (video && !this.videoElements.includes(video)) {
+        this.videoElements.push(video);
+      }
+    }
 
     this.bgTextures = textures;
     this.nextTextureIdx = Math.floor(Math.random() * textures.length);
@@ -82,19 +94,20 @@ export class BackgroundLayer extends Container {
       }
 
       if (progress >= 1) {
-        // before destroying the old sprite, ensure its video keeps looping
+        // before destroying the old sprite, restart its video so it keeps looping
         const oldActive = this.activeSprite;
         const oldSource = oldActive.texture.source as VideoSource | undefined;
-        const oldVideo = oldSource?.resource;
+        const oldVideo = oldSource?.resource as HTMLVideoElement | undefined;
         if (oldVideo) {
           oldVideo.loop = true;
-          // restart from beginning in case it reached the end
-          oldVideo.currentTime = 0;
           void oldVideo.play();
         }
 
         this.removeChild(oldActive);
-        oldActive.destroy();
+        // destroy sprite but NOT the underlying video element
+        // PixiJS Sprite.destroy() destroys children and texture — we need to prevent that
+        oldActive.texture?.source?.destroy();
+        oldActive.destroy({ children: false, texture: false });
 
         this.activeSprite = this.tempSprite!;
         this.activeSprite!.alpha = 1;
@@ -105,7 +118,7 @@ export class BackgroundLayer extends Container {
 
         // ensure current video is playing and looping
         const source = this.activeSprite!.texture.source as VideoSource;
-        const video = source.resource;
+        const video = source.resource as HTMLVideoElement | undefined;
         if (video) {
           video.loop = true;
           void video.play();
@@ -135,7 +148,7 @@ export class BackgroundLayer extends Container {
 
     // ensure the target video is playing and looping
     const source = newSprite.texture.source as VideoSource;
-    const video = source.resource;
+    const video = source.resource as HTMLVideoElement | undefined;
     if (video) {
       video.loop = true;
       void video.play();
@@ -160,7 +173,7 @@ export class BackgroundLayer extends Container {
 
     // ensure the target video is playing and looping
     const source = newSprite.texture.source as VideoSource;
-    const video = source.resource;
+    const video = source.resource as HTMLVideoElement | undefined;
     if (video) {
       video.loop = true;
       void video.play();
