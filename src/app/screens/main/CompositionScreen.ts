@@ -18,6 +18,8 @@ export class CompositionScreen extends Container {
   private spawner: AssetSpawner;
   private webcam: WebcamAsset;
   private bounds = { width: 1920, height: 1080 };
+  private paused = false;
+  private globalTime = 0;
 
   constructor() {
     super();
@@ -47,15 +49,29 @@ export class CompositionScreen extends Container {
   }
 
   public update(ticker: Ticker) {
-    this.spawner.update(ticker, this.bounds);
+    if (this.paused) return;
+    const dt = ticker.deltaMS / 1000;
+    this.globalTime += dt;
+    this.spawner.update(ticker, this.bounds, this.globalTime);
+    this.webcam.update(ticker);
   }
 
-  public async pause() {
+  public pause() {
+    this.paused = true;
     this.spawner.pause();
   }
 
-  public async resume() {
+  public resume() {
+    this.paused = false;
     this.spawner.resume();
+  }
+
+  public togglePause() {
+    if (this.paused) {
+      this.resume();
+    } else {
+      this.pause();
+    }
   }
 
   public reset() {
@@ -69,6 +85,7 @@ export class CompositionScreen extends Container {
   }
 
   public async hide() {
+    this.paused = false;
     this.spawner.stop();
     this.spawner.clear();
     this.webcam.stop();
@@ -130,14 +147,13 @@ export class CompositionScreen extends Container {
     window.addEventListener("keydown", (event) => {
       if (event.code === "Space") {
         event.preventDefault();
-        if (this.spawner.isPaused) {
-          this.spawner.resume();
-        } else {
-          this.spawner.pause();
-        }
+        this.togglePause();
       }
       if (event.code === "KeyR") {
         this.reset();
+      }
+      if (event.code === "KeyN") {
+        this.webcam.nextPreset();
       }
     });
   }
