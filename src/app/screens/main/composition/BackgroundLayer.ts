@@ -23,8 +23,11 @@ export class BackgroundLayer extends Container {
   private fadeInAlpha = 0;
   private needsFadeIn = false;
 
+  /** Fires when a new background texture becomes fully active */
+  public onNewBackground?: (texture: Texture) => void;
+
   private zoomData = new Map<Sprite, { baseScale: number; age: number }>();
-  private readonly zoomRate = 0.003;
+  private readonly zoomRate = 0.01;
 
   public async setMultipleBackgrounds() {
     const videoUrls: string[] = [];
@@ -213,6 +216,7 @@ export class BackgroundLayer extends Container {
         this.needsFadeIn = false;
         this.autoTimer = 0;
         this.nextAutoDelay = 20;
+        this.onNewBackground?.(this.activeSprite.texture);
       }
       return;
     }
@@ -240,6 +244,7 @@ export class BackgroundLayer extends Container {
 
         this.activeSprite = this.tempSprite!;
         this.activeSprite.alpha = 1;
+        this.onNewBackground?.(this.activeSprite.texture);
         this.tempSprite = null;
         this.transitioning = false;
         this.transitionElapsed = 0;

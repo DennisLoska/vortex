@@ -1,5 +1,5 @@
-import type { Ticker } from "pixi.js";
-import { Container } from "pixi.js";
+import type { Ticker, Texture } from "pixi.js";
+import { ColorMatrixFilter, Color, Container } from "pixi.js";
 
 import { engine } from "../../getEngine";
 import { AssetSpawner } from "./composition/AssetSpawner";
@@ -18,6 +18,7 @@ export class CompositionScreen extends Container {
   private bounds = { width: 1920, height: 1080 };
   private paused = false;
   private globalTime = 0;
+  private themeFilter = new ColorMatrixFilter();
 
   constructor() {
     super();
@@ -37,11 +38,43 @@ export class CompositionScreen extends Container {
     this.addChild(this.webcam);
 
     this.setupKeyboard();
+
+    this.assetLayer.filters = [this.themeFilter];
+    this.webcam.filters = [this.themeFilter];
   }
 
   public async prepare() {
     await this.background.setMultipleBackgrounds();
+    this.background.onNewBackground = (texture) => {
+      this.extractAndApplyTheme(texture);
+    };
     await this.textOverlay.loadPhrases();
+  }
+
+  private extractAndApplyTheme(texture: Texture) {
+    try {
+      const result = engine().renderer.extract.pixels(texture);
+      const px = result.pixels;
+      let r = 0,
+        g = 0,
+        b = 0,
+        count = 0;
+      for (let i = 0; i < px.length; i += 4) {
+        r += px[i];
+        g += px[i + 1];
+        b += px[i + 2];
+        count++;
+      }
+      r = Math.round(r / count);
+      g = Math.round(g / count);
+      b = Math.round(b / count);
+      const avg = new Color([r / 255, g / 255, b / 255]).toNumber();
+      this.themeFilter.reset();
+      this.themeFilter.tint(avg);
+      this.themeFilter.alpha = 0.3;
+    } catch {
+      // extraction fails silently on some GPU/configs
+    }
   }
 
   public async show() {
