@@ -27,7 +27,7 @@ export class BackgroundLayer extends Container {
   public onNewBackground?: (texture: Texture) => void;
 
   private zoomData = new Map<Sprite, { baseScale: number; age: number }>();
-  private readonly zoomRate = 0.01;
+  private readonly zoomRate = 0.008;
 
   public async setMultipleBackgrounds() {
     const videoUrls: string[] = [];
