@@ -1,15 +1,16 @@
 import { Container, Sprite, Texture, VideoSource } from "pixi.js";
 
-import { randomFloat } from "../../../../engine/utils/random";
-
 export class BackgroundLayer extends Container {
   private sprites: Sprite[] = [];
   private currentIdx = -1;
   private lastBounds = { width: 1920, height: 1080 };
   private transitioning = false;
-  private transitionDuration = randomFloat(1.5, 3);
+  private transitionDuration = 2.5;
   private transitionElapsed = 0;
-  private nextIdx = -1;
+
+  // ticker-based timer for next transition (replaces setTimeout)
+  private autoTimer = 0;
+  private nextAutoDelay = 30 + Math.random() * 60; // seconds
 
   public async setBackground(texture: Texture) {
     const sprite = new Sprite({ texture, anchor: 0.5 });
@@ -35,91 +36,89 @@ export class BackgroundLayer extends Container {
   }
 
   public update(dt: number) {
-    if (!this.transitioning || this.currentIdx < 0) return;
+    // handle transition fade
+    if (this.transitioning && this.currentIdx >= 0) {
+      this.transitionElapsed += dt;
+      const progress = Math.min(
+        this.transitionElapsed / this.transitionDuration,
+        1,
+      );
 
-    this.transitionElapsed += dt;
-    const progress = Math.min(
-      this.transitionElapsed / this.transitionDuration,
-      1,
-    );
+      // ease-in-out for smoother feel
+      const eased =
+        progress < 0.5
+          ? 2 * progress * progress
+          : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
-    // fade out current, fade in next
-    const alphaOut = 1 - progress;
-    const alphaIn = progress;
+      if (this.currentIdx >= 0 && this.currentIdx < this.sprites.length) {
+        this.sprites[this.currentIdx].alpha = 1 - eased;
+      }
+      if (this.nextSprite !== null && this.nextSprite !== undefined) {
+        this.nextSprite.alpha = eased;
+      }
 
-    if (this.currentIdx >= 0 && this.currentIdx < this.sprites.length) {
-      this.sprites[this.currentIdx].alpha = alphaOut;
-    }
-    if (this.nextIdx >= 0 && this.nextIdx < this.sprites.length) {
-      this.sprites[this.nextIdx].alpha = alphaIn;
-    }
+      if (progress >= 1) {
+        // transition complete — clean up old sprite
+        const oldSprite = this.sprites[this.currentIdx];
+        this.removeChild(oldSprite);
+        oldSprite.destroy();
+        this.sprites.splice(this.currentIdx, 1);
 
-    if (progress >= 1) {
-      // transition complete
-      this.currentIdx = this.nextIdx;
-      this.transitioning = false;
-      this.transitionElapsed = 0;
-      this.sprites.forEach((s, i) => {
-        s.alpha = i === this.currentIdx ? 1 : 0;
-      });
+        // promote next to current
+        this.sprites[0].alpha = 1;
+        this.currentIdx = 0;
+        this.transitioning = false;
+        this.transitionElapsed = 0;
+        this.nextSprite = null;
 
-      // schedule next transition after a random interval (30–90 seconds)
-      setTimeout(() => this.scheduleNextTransition(), 0);
+        // ensure current video is playing
+        const curSprite = this.sprites[this.currentIdx];
+        if (curSprite) {
+          const source = curSprite.texture.source as VideoSource;
+          const video = source.resource;
+          video?.play?.();
+        }
+
+        // reset auto timer for next transition
+        this.autoTimer = 0;
+        this.nextAutoDelay = 30 + Math.random() * 60;
+      }
+    } else {
+      // ticker-based auto-transition (replaces setTimeout)
+      if (this.sprites.length >= 2 && !this.transitioning) {
+        this.autoTimer += dt;
+        if (this.autoTimer >= this.nextAutoDelay) {
+          this.transitionToRandom();
+        }
+      }
     }
   }
 
-  private scheduleNextTransition() {
-    if (this.sprites.length < 2) return;
-
-    const delay = randomFloat(30, 90) * 1000;
-    setTimeout(() => {
-      this.transitionToRandom();
-    }, delay);
-  }
+  private nextSprite: Sprite | null = null;
 
   public transitionToRandom() {
     if (this.sprites.length < 2 || this.transitioning) return;
 
-    let next = this.currentIdx;
-    while (next === this.currentIdx) {
-      next = Math.floor(Math.random() * this.sprites.length);
+    // pick a different sprite index to fade in from the existing set
+    let targetIdx = Math.floor(Math.random() * this.sprites.length);
+    while (targetIdx === this.currentIdx && this.sprites.length > 1) {
+      targetIdx = Math.floor(Math.random() * this.sprites.length);
     }
 
-    this.nextIdx = next;
-    this.transitioning = true;
-    this.transitionDuration = randomFloat(1.5, 3);
-    this.transitionElapsed = 0;
+    // create a clone sprite for the incoming video
+    const sourceTexture = this.sprites[targetIdx].texture;
+    const newSprite = new Sprite({ texture: sourceTexture, anchor: 0.5 });
+    this.addChild(newSprite);
+    this.sprites.push(newSprite);
+    this.nextSprite = newSprite;
 
     // ensure the target video is playing
-    const targetSprite = this.sprites[next];
-    if (targetSprite) {
-      const source = targetSprite.texture.source as VideoSource;
-      const video = source.resource;
-      video?.play?.();
-    }
-  }
+    const source = newSprite.texture.source as VideoSource;
+    const video = source.resource;
+    video?.play?.();
 
-  public randomBackground() {
-    if (this.sprites.length === 0) return;
-
-    // pick a random index different from current
-    let idx = this.currentIdx;
-    while (idx === this.currentIdx && this.sprites.length > 1) {
-      idx = Math.floor(Math.random() * this.sprites.length);
-    }
-
-    if (this.transitioning) return;
-
-    this.nextIdx = idx;
     this.transitioning = true;
-    this.transitionDuration = randomFloat(1.5, 3);
+    this.transitionDuration = 2 + Math.random() * 2;
     this.transitionElapsed = 0;
-
-    const targetSprite = this.sprites[idx];
-    if (targetSprite) {
-      const source = targetSprite.texture.source as VideoSource;
-      const video = source.resource;
-      video?.play?.();
-    }
   }
 }

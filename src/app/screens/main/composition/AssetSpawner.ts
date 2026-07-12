@@ -188,7 +188,7 @@ export class AssetSpawner {
       const source = await Assets.load(entry.key);
       const gif = new GifSprite({ source, autoPlay: true });
       gif.anchor.set(0.5);
-      gif.scale.set(0.25 + Math.random() * 0.5);
+      gif.scale.set(0.35 + Math.random() * 0.4);
       return { view: gif, profile: "lively" };
     }
 
@@ -199,13 +199,13 @@ export class AssetSpawner {
       videoElement.loop = true;
       videoElement?.play?.();
       const video = new Sprite({ texture, anchor: 0.5 });
-      video.scale.set(0.25 + Math.random() * 0.5);
+      video.scale.set(0.35 + Math.random() * 0.4);
       return { view: video, profile: "gentle" };
     }
 
     const texture = await Assets.load<Texture>(entry.key);
     const sprite = new Sprite({ texture, anchor: 0.5 });
-    sprite.scale.set(0.25 + Math.random() * 0.5);
+    sprite.scale.set(0.35 + Math.random() * 0.4);
     return { view: sprite, profile: "gentle" };
   }
 }

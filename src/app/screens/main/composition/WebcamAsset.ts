@@ -16,6 +16,11 @@ export class WebcamAsset extends Container {
   );
   private idleTime = 0;
 
+  // cached mask dimensions so we only rebuild when size changes
+  private lastMaskW = -1;
+  private lastMaskH = -1;
+  private softMask: Graphics | null = null;
+
   constructor() {
     super();
   }
@@ -88,16 +93,70 @@ export class WebcamAsset extends Container {
     }
   }
 
+  private buildSoftMask(w: number, h: number) {
+    // destroy old mask graphics
+    if (this.softMask) {
+      const old = this.softMask;
+      this.removeChild(old);
+      old.destroy({ children: true });
+      this.softMask = null;
+    }
+
+    if (this.sprite?.mask) {
+      const old = this.sprite.mask as import("pixi.js").Container;
+      this.removeChild(old);
+      old.destroy({ children: true });
+      this.sprite.mask = null;
+    }
+
+    // build an elliptical soft mask using a filled Graphics shape
+    // the key is to draw many overlapping ellipses with decreasing alpha
+    // from center outward, creating a smooth radial falloff on ALL sides
+    const maskGraphics = new Graphics();
+    const cx = 0;
+    const cy = 0;
+
+    // use the larger dimension as the base radius for circular falloff
+    const maxDim = Math.max(w, h);
+    const edgeFade = (webcamConfig.mask.edgeFadeRadius ?? 60) * 1.5;
+
+    // draw concentric ellipses from outside in with increasing alpha
+    for (let r = maxDim / 2 + edgeFade; r > maxDim / 2 - edgeFade; r -= 3) {
+      const t = Math.max(
+        0,
+        Math.min(1, (r - (maxDim / 2 - edgeFade)) / (edgeFade * 2)),
+      );
+      // smooth easing for more organic feel
+      const eased = t * t * (3 - 2 * t); // smoothstep
+      maskGraphics
+        .ellipse(cx, cy, r * (w / maxDim), r * (h / maxDim))
+        .fill({ color: `rgba(255,255,255,${eased})` });
+    }
+
+    this.addChild(maskGraphics);
+    this.softMask = maskGraphics;
+    this.sprite!.mask = maskGraphics;
+  }
+
   public update(ticker: Ticker) {
     const dt = ticker.deltaMS / 1000;
     this.idleTime += dt;
 
     if (!this.sprite || !this.sprite.texture) return;
 
-    const maskCfg = webcamConfig.mask;
     const w = this.sprite.width;
+    const h = this.sprite.height;
 
-    // organic breathing scale
+    // rebuild soft mask when size changes (preset jump)
+    if (w !== this.lastMaskW || h !== this.lastMaskH) {
+      this.buildSoftMask(w, h);
+      this.lastMaskW = w;
+      this.lastMaskH = h;
+    }
+
+    const maskCfg = webcamConfig.mask;
+
+    // organic breathing scale — multi-frequency sine waves
     const breathe = Math.sin(this.idleTime * 0.6);
     const breathe2 = Math.sin(this.idleTime * 0.4 + 1.3);
     const breathe3 = Math.sin(this.idleTime * 0.25 + 2.7);
@@ -115,35 +174,6 @@ export class WebcamAsset extends Container {
     const rot2 =
       Math.sin(this.idleTime * 0.35 + 1.8) * (maskCfg.idleRotationRange * 0.4);
     this.rotation = ((rot1 + rot2) / 180) * Math.PI;
-
-    // alpha falloff at edges — creates the smoky dissolve effect
-    const edgeFade = maskCfg.edgeFadeRadius ?? 60;
-    const halfW = w / 2;
-
-    if (this.sprite.mask) {
-      const oldMask = this.sprite.mask as import("pixi.js").Container;
-      this.removeChild(oldMask);
-      oldMask.destroy({ children: true });
-      this.sprite.mask = null;
-    }
-
-    // build a soft radial gradient mask using Graphics
-    const maskGraphics = new Graphics();
-    const cx = 0;
-    const cy = 0;
-
-    // draw a large circle that covers the sprite center, with soft falloff via overlapping circles
-    // outer ring — full opacity at center, fading to transparent at edges
-    for (let r = halfW + edgeFade; r > halfW - edgeFade; r -= 2) {
-      const t = (r - (halfW - edgeFade)) / (edgeFade * 2);
-      const alpha = Math.max(0, Math.min(1, t));
-      maskGraphics
-        .circle(cx, cy, r)
-        .fill({ color: `rgba(255,255,255,${alpha})` });
-    }
-
-    this.addChild(maskGraphics as import("pixi.js").Container);
-    this.sprite.mask = maskGraphics;
 
     // auto-jump timer
     this.autoJumpTimer += dt;

@@ -10,18 +10,18 @@ export type ProfileConfig = {
 
 export const animationProfiles: Record<AnimationProfile, ProfileConfig> = {
   gentle: {
-    rotationRange: 4,
-    driftSpeed: { min: 10, max: 40 },
-    scalePulse: { min: 0.95, max: 1.05 },
-    lifetime: { min: 5, max: 9 },
-    fadeDuration: 0.5,
+    rotationRange: 3,
+    driftSpeed: { min: 5, max: 20 },
+    scalePulse: { min: 0.97, max: 1.03 },
+    lifetime: { min: 8, max: 14 },
+    fadeDuration: 0.8,
   },
   lively: {
-    rotationRange: 12,
-    driftSpeed: { min: 30, max: 80 },
-    scalePulse: { min: 0.9, max: 1.1 },
-    lifetime: { min: 3, max: 5 },
-    fadeDuration: 0.3,
+    rotationRange: 8,
+    driftSpeed: { min: 15, max: 40 },
+    scalePulse: { min: 0.93, max: 1.07 },
+    lifetime: { min: 5, max: 8 },
+    fadeDuration: 0.5,
   },
   none: {
     rotationRange: 0,
