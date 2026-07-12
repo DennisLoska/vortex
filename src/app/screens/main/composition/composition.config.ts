@@ -66,7 +66,7 @@ export const webcamConfig = {
 
 export const compositionConfig = {
   spawnInterval: { min: 3, max: 5 },
-  maxAssets: 5,
+  maxAssets: 3,
   backgroundAssetName: "background",
 };
 

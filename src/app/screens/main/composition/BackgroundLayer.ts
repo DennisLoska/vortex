@@ -9,14 +9,14 @@ export class BackgroundLayer extends Container {
   private tempSprite: Sprite | null = null;
   private lastBounds = { width: 1920, height: 1080 };
   private transitioning = false;
-  private transitionDuration = 4;
+  private transitionDuration = 10;
   private transitionElapsed = 0;
 
   private videos: HTMLVideoElement[] = [];
   private textures: Texture[] = [];
 
   private autoTimer = 0;
-  private nextAutoDelay = 3 + Math.random() * 2;
+  private nextAutoDelay = 10;
 
   private currentIdx = 0;
 
@@ -212,7 +212,7 @@ export class BackgroundLayer extends Container {
       if (this.fadeInAlpha >= 1) {
         this.needsFadeIn = false;
         this.autoTimer = 0;
-        this.nextAutoDelay = 3 + Math.random() * 2;
+        this.nextAutoDelay = 10;
       }
       return;
     }
@@ -244,7 +244,7 @@ export class BackgroundLayer extends Container {
         this.transitioning = false;
         this.transitionElapsed = 0;
         this.autoTimer = 0;
-        this.nextAutoDelay = 7 + Math.random() * 5;
+        this.nextAutoDelay = 10;
       }
       return;
     }
@@ -292,7 +292,7 @@ export class BackgroundLayer extends Container {
     if (video) void video.play();
 
     this.transitioning = true;
-    this.transitionDuration = 4;
+    this.transitionDuration = 10;
     this.transitionElapsed = 0;
   }
 }
