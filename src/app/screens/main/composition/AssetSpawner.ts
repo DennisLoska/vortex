@@ -81,6 +81,8 @@ export class AssetSpawner {
     }
     this.assets = [];
     this.dyingAssets = [];
+    this.occupiedCells.clear();
+    this.blockedCell = -1;
   }
 
   public update(

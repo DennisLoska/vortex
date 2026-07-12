@@ -73,7 +73,7 @@ export const webcamConfig = {
 
 export const compositionConfig = {
   spawnInterval: { min: 7, max: 12 },
-  maxAssets: 3,
+  maxAssets: 2,
 };
 
 export type CompositionConfig = typeof compositionConfig;
