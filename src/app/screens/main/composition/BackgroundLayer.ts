@@ -94,10 +94,13 @@ export class BackgroundLayer extends Container {
         this.transitioning = false;
         this.transitionElapsed = 0;
 
-        // ensure current video is playing
+        // ensure current video is playing and looping
         const source = this.activeSprite!.texture.source as VideoSource;
         const video = source.resource;
-        video?.play?.();
+        if (video) {
+          video.currentTime = 0;
+          video.play();
+        }
 
         // reset auto timer for next transition
         this.autoTimer = 0;
@@ -121,10 +124,13 @@ export class BackgroundLayer extends Container {
     this.addChild(newSprite);
     this.tempSprite = newSprite;
 
-    // ensure the target video is playing
+    // ensure the target video is playing and looping
     const source = newSprite.texture.source as VideoSource;
     const video = source.resource;
-    video?.play?.();
+    if (video) {
+      video.currentTime = 0;
+      video.play();
+    }
 
     this.transitioning = true;
     this.transitionDuration = 2 + Math.random() * 2;
@@ -143,10 +149,13 @@ export class BackgroundLayer extends Container {
     this.addChild(newSprite);
     this.tempSprite = newSprite;
 
-    // ensure the target video is playing
+    // ensure the target video is playing and looping
     const source = newSprite.texture.source as VideoSource;
     const video = source.resource;
-    video?.play?.();
+    if (video) {
+      video.currentTime = 0;
+      video.play();
+    }
 
     this.transitioning = true;
     this.transitionDuration = 2 + Math.random() * 2;
