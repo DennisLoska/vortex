@@ -57,9 +57,12 @@ export class TextOverlay extends Container {
       },
     });
     text.anchor.set(0.5);
-    const pad = 80;
-    text.x = randomFloat(pad, Math.max(pad, this.boundsWidth - pad));
-    text.y = randomFloat(pad, Math.max(pad, this.boundsHeight - pad));
+    const halfW = text.width * 0.5;
+    const halfH = text.height * 0.5;
+    const padX = halfW + 40;
+    const padY = halfH + 40;
+    text.x = randomFloat(padX, Math.max(padX, this.boundsWidth - padX));
+    text.y = randomFloat(padY, Math.max(padY, this.boundsHeight - padY));
     text.alpha = 0;
     this.addChild(text);
     this.currentText = text;
