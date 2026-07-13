@@ -16,6 +16,11 @@ export class WebcamAsset extends Container {
   );
   private idleTime = 0;
   private userPlaced = false;
+  private animationPaused = false;
+
+  public toggleAnimation() {
+    this.animationPaused = !this.animationPaused;
+  }
 
   constructor() {
     super();
@@ -130,6 +135,8 @@ export class WebcamAsset extends Container {
     this.idleTime += dt;
 
     if (!this.sprite || !this.sprite.texture) return;
+
+    if (this.animationPaused) return;
 
     const maskCfg = webcamConfig.mask;
 

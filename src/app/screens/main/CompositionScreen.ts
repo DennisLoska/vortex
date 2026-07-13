@@ -206,6 +206,10 @@ export class CompositionScreen extends Container {
       if (event.code === "KeyN" && !event.shiftKey) {
         this.webcam.nextPreset();
       }
+      if (event.code === "KeyT") {
+        event.preventDefault();
+        this.webcam.toggleAnimation();
+      }
       if (event.shiftKey && event.code === "KeyH") {
         event.preventDefault();
         this.assetLayer.visible = !this.assetLayer.visible;
