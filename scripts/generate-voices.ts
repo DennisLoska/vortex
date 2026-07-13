@@ -92,6 +92,8 @@ async function generateVoice(
   throw new Error(`Voicebox audio not ready after 120s (gen: ${gen.id})`);
 }
 
+const REGENERATE = process.argv.includes("--regenerate");
+
 async function main() {
   const projects = fs.readdirSync(PROJECTS_DIR, { withFileTypes: true })
     .filter((d) => d.isDirectory())
@@ -123,12 +125,18 @@ async function main() {
       total++;
       const stem = path.parse(textFile).name;
       const prefix = stem.split("_")[0];
-      const voiceFiles = fs.readdirSync(voicesDir)
+      const existingVoiceFiles = fs.readdirSync(voicesDir)
         .filter((f) => f.startsWith(prefix));
 
-      if (voiceFiles.length > 0) {
+      if (existingVoiceFiles.length > 0 && !REGENERATE) {
         skipped++;
         continue;
+      }
+
+      if (REGENERATE && existingVoiceFiles.length > 0) {
+        for (const f of existingVoiceFiles) {
+          fs.unlinkSync(path.join(voicesDir, f));
+        }
       }
 
       const textContent = fs.readFileSync(path.join(textsDir, textFile), "utf-8").trim();
