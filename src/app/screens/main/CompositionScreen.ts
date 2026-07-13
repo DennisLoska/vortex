@@ -81,6 +81,7 @@ export class CompositionScreen extends Container {
       this.extractAndApplyTheme(texture);
     };
     await this.textOverlay.loadPhrases();
+    await this.textOverlay.loadVoices();
     if (!this.webcamInitialized) {
       await this.webcam.init();
       this.webcamInitialized = true;
