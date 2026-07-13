@@ -213,8 +213,32 @@ export class AssetSpawner {
       gridPos.y,
     );
     this.assetCellMap.set(asset, gridPos.cellIdx);
-    this.assets.push(asset);
     this.container.addChild(view);
+
+    if (this.overlapsAny(view)) {
+      this.container.removeChild(view);
+      view.destroy({ children: true });
+      this.assetCellMap.delete(asset);
+      return;
+    }
+
+    this.assets.push(asset);
+  }
+
+  private overlapsAny(view: Container): boolean {
+    const b = view.getBounds();
+    for (const existing of this.assets) {
+      const eb = existing.view.getBounds();
+      if (
+        b.x < eb.x + eb.width &&
+        b.x + b.width > eb.x &&
+        b.y < eb.y + eb.height &&
+        b.y + b.height > eb.y
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private async createView(): Promise<{
