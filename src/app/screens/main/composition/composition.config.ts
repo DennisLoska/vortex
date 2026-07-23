@@ -68,10 +68,11 @@ export const webcamConfig = {
     blob: {
       segments: 20,
       morphSpeed: 1.0,
-      wobble: 10,
+      wobble: 20,
       phaseSpread: 2.5,
-      subdivisions: 100,
+      subdivisions: 42,
       feather: 20,
+      clip: 0.4,
     },
   },
 };

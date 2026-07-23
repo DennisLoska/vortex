@@ -147,7 +147,10 @@ export class WebcamAsset extends Container {
     const w = this.sprite.width;
     const h = this.sprite.height;
     this.blobMask.setSize(w, h);
-    this.blobMask.setRadii(w * 0.38, h * 0.38);
+    this.blobMask.setRadii(
+      w * webcamConfig.mask.blob.clip,
+      h * webcamConfig.mask.blob.clip,
+    );
   }
 
   public update(ticker: Ticker) {
@@ -159,27 +162,6 @@ export class WebcamAsset extends Container {
     this.blobMask.update(dt);
 
     if (this.animationPaused) return;
-
-    const maskCfg = webcamConfig.mask;
-
-    // organic breathing scale — multi-frequency sine waves
-    const breathe = Math.sin(this.idleTime * 0.6);
-    const breathe2 = Math.sin(this.idleTime * 0.4 + 1.3);
-    const breathe3 = Math.sin(this.idleTime * 0.25 + 2.7);
-
-    // subtle scale pulse — never resets to flat
-    const scaleRange =
-      (maskCfg.idleScalePulse.max - maskCfg.idleScalePulse.min) / 2;
-    const scaleMid =
-      (maskCfg.idleScalePulse.max + maskCfg.idleScalePulse.min) / 2;
-    const combinedBreath = breathe * 0.5 + breathe2 * 0.3 + breathe3 * 0.2;
-    this.scale.set(scaleMid + combinedBreath * scaleRange);
-
-    // gentle rotation — multi-frequency for organic feel
-    const rot1 = Math.sin(this.idleTime * 0.7) * maskCfg.idleRotationRange;
-    const rot2 =
-      Math.sin(this.idleTime * 0.35 + 1.8) * (maskCfg.idleRotationRange * 0.4);
-    this.rotation = ((rot1 + rot2) / 180) * Math.PI;
 
     // auto-jump timer — disabled after manual drag
     if (!this.userPlaced) {

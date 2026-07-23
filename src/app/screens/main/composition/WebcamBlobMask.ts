@@ -35,19 +35,21 @@ export class WebcamBlobMask extends Sprite {
     this.height = height;
   }
 
-  public setSize(w: number, h: number) {
-    const pad = this.config.feather + this.config.wobble * 1.5;
-    this.canvas.width = Math.ceil(w + pad * 2);
-    this.canvas.height = Math.ceil(h + pad * 2);
-    this.texture.source.resize(this.canvas.width, this.canvas.height);
-    this.texture.source.update();
-    this.width = w;
-    this.height = h;
-  }
-
   public setRadii(rx: number, ry: number) {
     this.radiusX = rx;
     this.radiusY = ry;
+  }
+
+  public setSize(w: number, h: number) {
+    const pad = this.config.feather + this.config.wobble * 1.5;
+    const cw = Math.ceil(w + pad * 2);
+    const ch = Math.ceil(h + pad * 2);
+    this.width = w;
+    this.height = h;
+
+    if (this.canvas.width !== cw || this.canvas.height !== ch) {
+      this.texture.source.resize(cw, ch);
+    }
   }
 
   public update(dt: number) {
