@@ -9,6 +9,7 @@ import { FixedAssetLayer } from "./composition/FixedAssetLayer";
 import { TextOverlay } from "./composition/TextOverlay";
 import { StatusOverlay } from "./composition/StatusOverlay";
 import { WebcamAsset } from "./composition/WebcamAsset";
+import { SceneBuilder } from "../../scene-builder/SceneBuilder";
 
 let _activeProject: string | null = null;
 
@@ -26,6 +27,7 @@ export class CompositionScreen extends Container {
   private themeFilter = new ColorMatrixFilter();
   private projects = getProjectNames();
   private currentProject: string;
+  private sceneBuilder: SceneBuilder | null = null;
 
   constructor() {
     super();
@@ -61,6 +63,15 @@ export class CompositionScreen extends Container {
 
     this.assetLayer.filters = [this.themeFilter];
     this.webcam.filters = [this.themeFilter];
+
+    this.sceneBuilder = new SceneBuilder(
+      this.background,
+      this.assetLayer,
+      this.fixedLayer,
+      this.statusOverlay,
+      this.webcam,
+      this.currentProject,
+    );
   }
 
   private webcamInitialized = false;
@@ -178,6 +189,7 @@ export class CompositionScreen extends Container {
     this.currentProject = name;
     this.spawner.setProject(name);
     this.textOverlay.setProject(name);
+    this.sceneBuilder?.setProject(name);
     this.fixedLayer.clear();
     this.background.removeChildren();
     await this.prepare();
@@ -210,6 +222,11 @@ export class CompositionScreen extends Container {
       } else if (event.code === "KeyH") {
         event.preventDefault();
         this.webcam.visible = !this.webcam.visible;
+      }
+
+      if (event.code === "KeyM") {
+        event.preventDefault();
+        this.sceneBuilder?.toggle();
       }
 
       const num = parseInt(event.key);
