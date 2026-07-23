@@ -37,3 +37,4 @@ src/manifest.json
 projects/
 
 .oneshot-state
+.opencode/
