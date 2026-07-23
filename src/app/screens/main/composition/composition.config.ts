@@ -82,4 +82,14 @@ export const compositionConfig = {
   maxAssets: 2,
 };
 
+export const fonts = {
+  poem: "Caveat, cursive",
+  poemSerif: "EB Garamond, Georgia, serif",
+  poemScript: "Dancing Script, cursive",
+  poemModern: "Cormorant Garamond, serif",
+  label: "Arial Rounded MT Bold",
+  heading: "Playfair Display, Georgia, serif",
+  mono: "JetBrains Mono, monospace",
+};
+
 export type CompositionConfig = typeof compositionConfig;

@@ -3,6 +3,7 @@ import { sound } from "@pixi/sound";
 
 import { engine } from "../../../getEngine";
 import { randomFloat } from "../../../../engine/utils/random";
+import { fonts } from "./composition.config";
 
 const textModules = import.meta.glob("/projects/*/texts/*.txt", {
   query: "?raw",
@@ -86,7 +87,7 @@ export class TextOverlay extends Container {
     const text = new Text({
       text: entry.text,
       style: {
-        fontFamily: "Caveat, cursive",
+        fontFamily: fonts.poemModern,
         fontSize: 32,
         fill: 0xffffff,
         wordWrap: true,
