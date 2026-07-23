@@ -3,6 +3,7 @@ import { Container, Sprite, Texture, VideoSource } from "pixi.js";
 
 import { randomFloat } from "../../../../engine/utils/random";
 import { webcamConfig, webcamPresets } from "./composition.config";
+import { WebcamBlobMask } from "./WebcamBlobMask";
 
 export class WebcamAsset extends Container {
   private videoElement: HTMLVideoElement | undefined;
@@ -17,6 +18,7 @@ export class WebcamAsset extends Container {
   private idleTime = 0;
   private userPlaced = false;
   private animationPaused = false;
+  private blobMask!: WebcamBlobMask;
 
   public toggleAnimation() {
     this.animationPaused = !this.animationPaused;
@@ -73,6 +75,15 @@ export class WebcamAsset extends Container {
       const texture = new Texture({ source });
       this.sprite = new Sprite({ texture, anchor: 0.5 });
       this.addChild(this.sprite);
+
+      this.blobMask = new WebcamBlobMask(
+        webcamConfig.mask.blob,
+        webcamConfig.mask.width,
+        webcamConfig.mask.height,
+      );
+      this.addChild(this.blobMask);
+      this.setMask({ mask: this.blobMask, channel: "alpha" });
+
       this.applyPreset(0);
     } catch (error) {
       console.warn("Webcam access denied or unavailable:", error);
@@ -128,6 +139,18 @@ export class WebcamAsset extends Container {
       this.sprite.width = w;
       this.sprite.height = h;
     }
+    this.syncMaskRadius();
+  }
+
+  private syncMaskRadius() {
+    if (!this.sprite || !this.blobMask) return;
+    const w = this.sprite.width;
+    const h = this.sprite.height;
+    this.blobMask.setSize(w, h);
+    this.blobMask.setRadii(
+      w * webcamConfig.mask.blob.clip,
+      h * webcamConfig.mask.blob.clip,
+    );
   }
 
   public update(ticker: Ticker) {
@@ -136,28 +159,9 @@ export class WebcamAsset extends Container {
 
     if (!this.sprite || !this.sprite.texture) return;
 
+    this.blobMask.update(dt);
+
     if (this.animationPaused) return;
-
-    const maskCfg = webcamConfig.mask;
-
-    // organic breathing scale — multi-frequency sine waves
-    const breathe = Math.sin(this.idleTime * 0.6);
-    const breathe2 = Math.sin(this.idleTime * 0.4 + 1.3);
-    const breathe3 = Math.sin(this.idleTime * 0.25 + 2.7);
-
-    // subtle scale pulse — never resets to flat
-    const scaleRange =
-      (maskCfg.idleScalePulse.max - maskCfg.idleScalePulse.min) / 2;
-    const scaleMid =
-      (maskCfg.idleScalePulse.max + maskCfg.idleScalePulse.min) / 2;
-    const combinedBreath = breathe * 0.5 + breathe2 * 0.3 + breathe3 * 0.2;
-    this.scale.set(scaleMid + combinedBreath * scaleRange);
-
-    // gentle rotation — multi-frequency for organic feel
-    const rot1 = Math.sin(this.idleTime * 0.7) * maskCfg.idleRotationRange;
-    const rot2 =
-      Math.sin(this.idleTime * 0.35 + 1.8) * (maskCfg.idleRotationRange * 0.4);
-    this.rotation = ((rot1 + rot2) / 180) * Math.PI;
 
     // auto-jump timer — disabled after manual drag
     if (!this.userPlaced) {

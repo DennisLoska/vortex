@@ -61,20 +61,35 @@ export const webcamPresets: WebcamPreset[] = [
 export const webcamConfig = {
   autoJumpInterval: { min: 30, max: 60 },
   mask: {
-    cornerRadius: 24,
     width: 480,
     height: 360,
     idleScalePulse: { min: 0.92, max: 1.08 },
     idleRotationRange: 3,
-    idleCycle: 5,
-    edgeFadeRadius: 60,
-    displacementScale: 15,
+    blob: {
+      segments: 20,
+      morphSpeed: 1.0,
+      wobble: 20,
+      phaseSpread: 2.5,
+      subdivisions: 42,
+      feather: 20,
+      clip: 0.4,
+    },
   },
 };
 
 export const compositionConfig = {
   spawnInterval: { min: 7, max: 12 },
   maxAssets: 2,
+};
+
+export const fonts = {
+  poem: "Caveat, cursive",
+  poemSerif: "EB Garamond, Georgia, serif",
+  poemScript: "Dancing Script, cursive",
+  poemModern: "Cormorant Garamond, serif",
+  label: "Arial Rounded MT Bold",
+  heading: "Playfair Display, Georgia, serif",
+  mono: "JetBrains Mono, monospace",
 };
 
 export type CompositionConfig = typeof compositionConfig;
