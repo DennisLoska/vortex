@@ -11,6 +11,7 @@ export type FixedAssetConfig = {
 };
 
 export class FixedAsset extends Container {
+  public readonly alias: string;
   private sprite: Sprite | GifSprite;
   private dragging = false;
   private dragOffset = { x: 0, y: 0 };
@@ -18,8 +19,13 @@ export class FixedAsset extends Container {
   private boundsWidth = 1920;
   private boundsHeight = 1080;
 
-  private constructor(sprite: Sprite | GifSprite, preset: FixedAssetConfig) {
+  private constructor(
+    alias: string,
+    sprite: Sprite | GifSprite,
+    preset: FixedAssetConfig,
+  ) {
     super();
+    this.alias = alias;
     this.sprite = sprite;
     this.preset = preset;
     this.sprite.anchor.set(0.5);
@@ -35,10 +41,10 @@ export class FixedAsset extends Container {
     if (ext === "gif") {
       const source = await Assets.load(alias);
       const gif = new GifSprite({ source, autoPlay: true });
-      return new FixedAsset(gif, preset);
+      return new FixedAsset(alias, gif, preset);
     }
     const texture = await Assets.load<Texture>(alias);
-    return new FixedAsset(new Sprite({ texture }), preset);
+    return new FixedAsset(alias, new Sprite({ texture }), preset);
   }
 
   private applyPreset() {
@@ -76,6 +82,14 @@ export class FixedAsset extends Container {
     };
     this.on("pointerup", stopDrag);
     this.on("pointerupoutside", stopDrag);
+  }
+
+  public get spriteScale(): number {
+    return this.sprite.scale.x;
+  }
+
+  public set spriteScale(value: number) {
+    this.sprite.scale.set(value);
   }
 
   public resize(width: number, height: number) {

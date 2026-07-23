@@ -13,10 +13,12 @@ import {
   getProjectFixAssets,
 } from "../assetManifest";
 import { BackgroundLayer } from "../screens/main/composition/BackgroundLayer";
+import { FixedAsset } from "../screens/main/composition/FixedAsset";
 import { FixedAssetLayer } from "../screens/main/composition/FixedAssetLayer";
 import { StatusOverlay } from "../screens/main/composition/StatusOverlay";
 import { WebcamAsset } from "../screens/main/composition/WebcamAsset";
-import { FILTER_PRESETS } from "./filterPresets";
+import { FILTER_PRESETS, getFilterPreset } from "./filterPresets";
+import { loadStates, saveStates, type SceneState } from "./SceneState";
 
 type LayerId = "background" | "asset" | "fixed" | "status" | "webcam";
 
@@ -82,6 +84,7 @@ export class SceneBuilder {
     this.contentEl = root.querySelector(".sb-content") as HTMLDivElement;
 
     this.bindEvents();
+    this.populateStatesDropdown();
     this.renderLayer("background");
   }
 
@@ -98,6 +101,12 @@ export class SceneBuilder {
               `<button class="sb-tab" data-layer="${id}">${this.layerLabel(id)}</button>`,
           )
           .join("")}
+      </div>
+      <div class="sb-states-bar">
+        <select class="sb-states-select"><option value="">— Saved States —</option></select>
+        <button class="sb-states-save" title="Save current as new state">+</button>
+        <button class="sb-states-load" title="Load selected state">↻</button>
+        <button class="sb-states-del" title="Delete selected state">✕</button>
       </div>
       <div class="sb-content"></div>
     `;
@@ -126,6 +135,18 @@ export class SceneBuilder {
     });
 
     this.overlay.addEventListener("click", () => this.hide());
+
+    this.element
+      .querySelector(".sb-states-save")
+      ?.addEventListener("click", () => this.saveCurrentState());
+
+    this.element
+      .querySelector(".sb-states-load")
+      ?.addEventListener("click", () => this.loadSelectedState());
+
+    this.element
+      .querySelector(".sb-states-del")
+      ?.addEventListener("click", () => this.deleteSelectedState());
   }
 
   private switchTab(layer: LayerId): void {
@@ -172,7 +193,12 @@ export class SceneBuilder {
         const label = this.contentEl.querySelector(".sb-filter-val");
         if (label) label.textContent = `${val}%`;
         const inst = this.filterInstances.get(layerId);
-        if (inst) this.adjustFilterIntensity(inst, val);
+        if (inst)
+          this.adjustFilterIntensity(
+            inst,
+            this.controlState[layerId].currentFilter,
+            val,
+          );
       });
 
     this.contentEl.querySelectorAll(".sb-draggable").forEach((el) => {
@@ -242,6 +268,7 @@ export class SceneBuilder {
     if (filter) {
       this.adjustFilterIntensity(
         filter,
+        presetName,
         this.controlState[layerId].filterIntensity,
       );
       (container as unknown as { filters: unknown }).filters = [filter];
@@ -250,7 +277,16 @@ export class SceneBuilder {
     }
   }
 
-  private adjustFilterIntensity(filter: Filter, pct: number): void {
+  private adjustFilterIntensity(
+    filter: Filter,
+    presetName: string,
+    pct: number,
+  ): void {
+    const preset = getFilterPreset(presetName);
+    if (preset?.adjustIntensity) {
+      preset.adjustIntensity(filter, Math.max(0, Math.min(100, pct)) / 100);
+      return;
+    }
     const t = Math.max(0, Math.min(100, pct)) / 100;
     if (filter instanceof ColorMatrixFilter) {
       filter.alpha = t;
@@ -266,7 +302,7 @@ export class SceneBuilder {
   private layerContentHTML(
     state: LayerControlState,
     available: { key: string; type: string }[],
-    loaded: { key: string; type: string }[],
+    loaded: { key: string; type: string; coords?: string }[],
   ): string {
     const filterOptions = FILTER_PRESETS.map(
       (p) =>
@@ -278,7 +314,13 @@ export class SceneBuilder {
           .map(
             (a) =>
               `<li class="sb-asset-item sb-draggable" draggable="true" data-key="${a.key}">
-                <span class="sb-asset-icon">${a.type === "image" ? "🖼" : a.type === "video" ? "🎬" : "🎞"}</span>
+                <span class="sb-thumb-wrap">${
+                  a.type === "video"
+                    ? '<span class="sb-thumb-video">▶</span>'
+                    : `<img class="sb-thumb" src="/assets/${a.key}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display=''">`
+                }
+                  <span class="sb-thumb-fallback" style="display:none">${a.type === "image" ? "🖼" : "🎞"}</span>
+                </span>
                 <span class="sb-asset-name">${a.key.split("/").pop()}</span>
               </li>`,
           )
@@ -290,8 +332,12 @@ export class SceneBuilder {
           .map(
             (l) =>
               `<li class="sb-asset-item sb-loaded-item">
-                <span class="sb-asset-icon">${l.type === "image" ? "🖼" : l.type === "video" ? "🎬" : "🎞"}</span>
+                <span class="sb-thumb-wrap">
+                  <img class="sb-thumb" src="/assets/${l.key}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display=''">
+                  <span class="sb-thumb-fallback" style="display:none">${l.type === "image" ? "🖼" : l.type === "video" ? "🎬" : "🎞"}</span>
+                </span>
                 <span class="sb-asset-name">${l.key.split("/").pop()}</span>
+                ${l.coords ? `<span class="sb-coords">${l.coords}</span>` : ""}
                 <button class="sb-loaded-remove" data-key="${l.key}">✕</button>
               </li>`,
           )
@@ -355,23 +401,32 @@ export class SceneBuilder {
     }
   }
 
-  private getLoadedAssets(layerId: LayerId): { key: string; type: string }[] {
+  private getLoadedAssets(
+    layerId: LayerId,
+  ): { key: string; type: string; coords?: string }[] {
     switch (layerId) {
       case "background": {
         if (this.bgLayer.children.length === 0) return [];
         return this.bgLayer.children
           .filter((c) => c instanceof Sprite)
           .map((c) => {
-            const tex = (c as Sprite).texture;
-            const label = tex.label || "background";
-            return { key: label, type: "image" };
+            const s = c as Sprite;
+            const k = s.label || s.texture.label || "background";
+            return {
+              key: k,
+              type: k.toLowerCase().endsWith(".mp4") ? "video" : "image",
+            };
           });
       }
       case "fixed":
-        return this.fixedLayer.children.map((_, i) => ({
-          key: `fixed-asset-${i}`,
-          type: "image",
-        }));
+        return this.fixedLayer.children.map((c) => {
+          const alias = c instanceof FixedAsset ? c.alias : c.label;
+          return {
+            key: alias || `fixed-asset-${this.fixedLayer.children.indexOf(c)}`,
+            type: alias?.toLowerCase().endsWith(".gif") ? "gif" : "image",
+            coords: `(${Math.round(c.x)}, ${Math.round(c.y)})`,
+          };
+        });
       case "status":
         return [{ key: "hearts + xp + level", type: "image" }];
       case "webcam":
@@ -379,7 +434,11 @@ export class SceneBuilder {
           ? [{ key: "webcam-feed", type: "video" }]
           : [];
       case "asset":
-        return [];
+        return this.assetLayer.children.map((c) => ({
+          key: c.label || "asset",
+          type: "image",
+          coords: `(${Math.round(c.x)}, ${Math.round(c.y)})`,
+        }));
     }
   }
 
@@ -391,19 +450,41 @@ export class SceneBuilder {
     this.dropZone.classList.add("active");
   }
 
+  private dropHandlers: (() => void)[] = [];
+
   private setupCanvasDrop(): void {
-    const canvas = engine().canvas as HTMLCanvasElement;
-    canvas.addEventListener("dragover", (e) => e.preventDefault());
+    this.dropHandlers.forEach((fn) => fn());
+    this.dropHandlers = [];
 
-    canvas.addEventListener("drop", (e) => {
-      e.preventDefault();
-      this.dropZone.classList.remove("active");
+    const targets = [
+      engine().canvas as HTMLElement,
+      this.overlay,
+      this.dropZone,
+    ];
 
-      const raw = e.dataTransfer?.getData("text/plain");
-      if (!raw) return;
-      const { layer, key } = JSON.parse(raw);
-      this.handleDrop(layer as LayerId, key, e.clientX, e.clientY);
-    });
+    for (const el of targets) {
+      const onOver = (e: Event) => e.preventDefault();
+      const onDrop = (e: Event) => {
+        const de = e as DragEvent;
+        de.preventDefault();
+        this.dropZone.classList.remove("active");
+        const raw = de.dataTransfer?.getData("text/plain");
+        if (!raw) return;
+        try {
+          const { layer, key } = JSON.parse(raw);
+          this.handleDrop(layer as LayerId, key, de.clientX, de.clientY);
+        } catch {
+          /* bad payload */
+        }
+      };
+
+      el.addEventListener("dragover", onOver);
+      el.addEventListener("drop", onDrop);
+      this.dropHandlers.push(() => {
+        el.removeEventListener("dragover", onOver);
+        el.removeEventListener("drop", onDrop);
+      });
+    }
   }
 
   private async handleDrop(
@@ -455,6 +536,7 @@ export class SceneBuilder {
         gif.anchor.set(0.5);
         gif.position.set(x, y);
         gif.scale.set(0.5);
+        gif.label = key;
         this.assetLayer.addChild(gif);
         return;
       }
@@ -463,6 +545,7 @@ export class SceneBuilder {
       const sprite = new Sprite({ texture, anchor: 0.5 });
       sprite.position.set(x, y);
       sprite.scale.set(0.5);
+      sprite.label = key;
       this.assetLayer.addChild(sprite);
     } catch (err) {
       console.error("Failed to load dropped asset:", key, err);
@@ -490,6 +573,7 @@ export class SceneBuilder {
       child.scale.set(0.5);
       child.eventMode = "static";
       child.cursor = "grab";
+      child.label = key;
       this.fixedLayer.addChild(child);
       this.setupFixedDrag(child);
     } catch (err) {
@@ -530,8 +614,10 @@ export class SceneBuilder {
   private removeAsset(layerId: LayerId, key: string): void {
     switch (layerId) {
       case "fixed": {
-        const idx = parseInt(key.replace("fixed-asset-", ""), 10);
-        const child = this.fixedLayer.children[idx];
+        const child = this.fixedLayer.children.find(
+          (c) =>
+            (c instanceof FixedAsset && c.alias === key) || c.label === key,
+        );
         if (child) {
           child.removeFromParent();
           child.destroy({ children: true });
@@ -548,9 +634,194 @@ export class SceneBuilder {
     }
   }
 
+  // ─── Scene state management ───
+
+  private getStates(): SceneState[] {
+    return loadStates(this.currentProject);
+  }
+
+  private persistStates(states: SceneState[]): void {
+    saveStates(this.currentProject, states);
+    this.populateStatesDropdown(states);
+  }
+
+  private populateStatesDropdown(states?: SceneState[]): void {
+    const list = states ?? this.getStates();
+    const sel = this.element.querySelector(
+      ".sb-states-select",
+    ) as HTMLSelectElement;
+    if (!sel) return;
+    sel.innerHTML =
+      `<option value="">— Saved States —</option>` +
+      list.map((s, i) => `<option value="${i}">${s.name}</option>`).join("");
+  }
+
+  private serializeCurrentState(name: string): SceneState {
+    const fixedAssets: {
+      alias: string;
+      x: number;
+      y: number;
+      scale: number;
+    }[] = [];
+    const draggedAssets: {
+      alias: string;
+      x: number;
+      y: number;
+      scale: number;
+    }[] = [];
+
+    for (const child of this.fixedLayer.children) {
+      if (child instanceof FixedAsset) {
+        fixedAssets.push({
+          alias: child.alias,
+          x: child.x,
+          y: child.y,
+          scale: child.spriteScale,
+        });
+      } else {
+        draggedAssets.push({
+          alias: child.label || "",
+          x: child.x,
+          y: child.y,
+          scale: child.scale.x,
+        });
+      }
+    }
+
+    for (const child of this.assetLayer.children) {
+      draggedAssets.push({
+        alias: child.label || "",
+        x: child.x,
+        y: child.y,
+        scale: child.scale.x,
+      });
+    }
+
+    const layers: Record<
+      string,
+      { visible: boolean; filter: string; filterIntensity: number }
+    > = {};
+    for (const [id, st] of Object.entries(this.controlState)) {
+      layers[id] = {
+        visible: st.visible,
+        filter: st.currentFilter,
+        filterIntensity: st.filterIntensity,
+      };
+    }
+
+    return {
+      name,
+      timestamp: Date.now(),
+      fixedAssets,
+      draggedAssets,
+      layers,
+    };
+  }
+
+  private saveCurrentState(): void {
+    const name = prompt(
+      "Name this scene state:",
+      `State ${this.getStates().length + 1}`,
+    );
+    if (!name) return;
+    const states = this.getStates();
+    states.push(this.serializeCurrentState(name));
+    this.persistStates(states);
+  }
+
+  private async loadSelectedState(): Promise<void> {
+    const sel = this.element.querySelector(
+      ".sb-states-select",
+    ) as HTMLSelectElement;
+    const idx = parseInt(sel?.value, 10);
+    if (isNaN(idx)) return;
+
+    const states = this.getStates();
+    const st = states[idx];
+    if (!st) return;
+
+    // Clear layers
+    this.fixedLayer.removeChildren();
+    this.assetLayer.removeChildren();
+
+    // Restore layer visibility and filters
+    for (const [id, layerSt] of Object.entries(st.layers)) {
+      const lid = id as LayerId;
+      if (this.controlState[lid]) {
+        this.controlState[lid].visible = layerSt.visible;
+        this.controlState[lid].currentFilter = layerSt.filter;
+        this.controlState[lid].filterIntensity = layerSt.filterIntensity;
+        this.setLayerVisible(lid, layerSt.visible);
+        this.applyFilter(lid, layerSt.filter);
+      }
+    }
+
+    // Restore fixed assets
+    for (const fa of st.fixedAssets) {
+      try {
+        const cfg = {
+          file: fa.alias.split("/").pop() || "",
+          x: fa.x / 1920,
+          y: fa.y / 1080,
+        };
+        const asset = await FixedAsset.load(fa.alias, cfg);
+        asset.x = fa.x;
+        asset.y = fa.y;
+        asset.spriteScale = fa.scale;
+        this.fixedLayer.addChild(asset);
+      } catch {
+        // skip failed
+      }
+    }
+
+    // Restore dragged assets
+    for (const da of st.draggedAssets) {
+      if (!da.alias) continue;
+      try {
+        const ext = da.alias.split(".").pop()?.toLowerCase();
+        let child: Container;
+        if (ext === "gif") {
+          const source = await Assets.load(da.alias);
+          const gif = new GifSprite({ source, autoPlay: true });
+          gif.anchor.set(0.5);
+          child = gif;
+        } else {
+          const texture = await Assets.load<Texture>(da.alias);
+          child = new Sprite({ texture, anchor: 0.5 });
+        }
+        child.position.set(da.x, da.y);
+        child.scale.set(da.scale);
+        child.label = da.alias;
+        child.eventMode = "static";
+        child.cursor = "grab";
+        this.fixedLayer.addChild(child);
+        this.setupFixedDrag(child);
+      } catch {
+        // skip
+      }
+    }
+
+    if (this.visible) this.renderLayer(this.activeLayer);
+  }
+
+  private deleteSelectedState(): void {
+    const sel = this.element.querySelector(
+      ".sb-states-select",
+    ) as HTMLSelectElement;
+    const idx = parseInt(sel?.value, 10);
+    if (isNaN(idx)) return;
+
+    let states = this.getStates();
+    states = states.filter((_, i) => i !== idx);
+    this.persistStates(states);
+  }
+
   public setProject(name: string): void {
     this.currentProject = name;
-    if (this.visible) this.renderLayer(this.activeLayer);
+    if (this.visible) {
+      this.populateStatesDropdown();
+      this.renderLayer(this.activeLayer);
+    }
   }
 
   public toggle(): void {
@@ -563,6 +834,7 @@ export class SceneBuilder {
     this.element.classList.add("open");
     this.overlay.classList.add("open");
     this.setupCanvasDrop();
+    this.populateStatesDropdown();
     this.renderLayer(this.activeLayer);
   }
 

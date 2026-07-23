@@ -216,7 +216,7 @@ body {
   list-style: none;
   padding: 0;
   margin: 0;
-  max-height: 140px;
+  max-height: 400px;
   overflow-y: auto;
 }
 .sb-asset-list::-webkit-scrollbar {
@@ -246,6 +246,32 @@ body {
   cursor: grabbing;
   background: rgba(124, 77, 255, 0.15);
 }
+.sb-thumb-wrap {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  overflow: hidden;
+  background: #0f0f23;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.sb-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sb-thumb-fallback {
+  font-size: 14px;
+  line-height: 1;
+}
+.sb-thumb-video {
+  font-size: 12px;
+  color: #7c4dff;
+  opacity: 0.7;
+}
 .sb-asset-icon {
   width: 18px;
   text-align: center;
@@ -268,6 +294,13 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+.sb-coords {
+  font-size: 10px;
+  color: #555;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .sb-loaded-remove {
   background: none;
@@ -292,6 +325,61 @@ body {
   border-top: 1px solid #1a1a3e;
 }
 
+/* ─── Saved States Bar ─── */
+
+.sb-states-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  background: #0f0f23;
+  border-bottom: 1px solid #2a2a4a;
+  flex-shrink: 0;
+}
+.sb-states-select {
+  flex: 1;
+  padding: 4px 6px;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  border: 1px solid #2a2a4a;
+  border-radius: 3px;
+  font-size: 11px;
+  cursor: pointer;
+  outline: none;
+  min-width: 0;
+}
+.sb-states-select:focus {
+  border-color: #7c4dff;
+}
+.sb-states-bar button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  border-radius: 3px;
+  color: #e0e0e0;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.sb-states-bar button:hover {
+  background: #2a2a4a;
+  border-color: #7c4dff;
+}
+.sb-states-save {
+  color: #4caf50 !important;
+}
+.sb-states-load {
+  color: #7c4dff !important;
+}
+.sb-states-del {
+  color: #ff4444 !important;
+}
+
 /* ─── Scene Builder Drop Zone ─── */
 
 #scene-builder-dropzone {
@@ -300,7 +388,7 @@ body {
   left: 0;
   right: 340px;
   bottom: 0;
-  z-index: 998;
+  z-index: 1001;
   display: none;
   align-items: center;
   justify-content: center;
@@ -313,4 +401,5 @@ body {
 }
 #scene-builder-dropzone.active {
   display: flex;
+  pointer-events: auto;
 }
