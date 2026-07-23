@@ -34,7 +34,9 @@ public/assets/
 src/manifest.json
 
 # Project media assets (kept out of git; distribute separately)
-projects/
+projects/*
+!projects/*/
+!projects/*/project.json
 
 .oneshot-state
 .opencode/

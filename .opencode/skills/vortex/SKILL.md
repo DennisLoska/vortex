@@ -11,23 +11,16 @@ PixiJS v8 app. Each project in `projects/<name>/` is a self-contained media comp
 
 ```
 projects/<name>/
+  project.json       ← config: { "language": "EN" | "DE" }
   backgrounds/       ← images (PNG/JPG/WebP) for background layer crossfade
-  gifs/              ← animated GIFs for asset spawner
   assets/            ← images + videos (PNG/MP4) for random spawn pool
   texts/             ← numbered .txt files (01_intro.txt, 02_scene.txt)
 ```
 
 ## Add New Project
 
-Creates file structure only — **no content files**:
-
 ```bash
-template=".opencode/skills/vortex/new-project.sh"
-name="my-project"
-mkdir -p "projects/$name/backgrounds" "projects/$name/gifs" "projects/$name/assets" "projects/$name/texts"
-echo "01_" > "projects/$name/texts/01_placeholder.txt"
-echo "02_" > "projects/$name/texts/02_placeholder.txt"
-echo "03_" > "projects/$name/texts/03_placeholder.txt"
+bash .opencode/skills/vortex/new-project.sh <name> [EN|DE]
 ```
 
 Then populate media files into each directory. AssetPack processes them on next `npm run dev` or `npm run build`. Hotkeys 1-9 auto-discover the new project at next screen load.

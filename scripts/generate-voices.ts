@@ -27,73 +27,19 @@ const VOICE_NAME_DE = (
 
 const PROJECTS_DIR = path.resolve(import.meta.dirname, "..", "projects");
 
-const GERMAN_WORDS = new Set([
-  "der",
-  "die",
-  "das",
-  "und",
-  "ist",
-  "sind",
-  "ein",
-  "eine",
-  "nicht",
-  "sich",
-  "auch",
-  "auf",
-  "für",
-  "mit",
-  "als",
-  "bei",
-  "nach",
-  "aus",
-  "dass",
-  "diese",
-  "durch",
-  "über",
-  "vor",
-  "zwischen",
-  "oder",
-  "aber",
-  "denn",
-  "zum",
-  "zur",
-  "vom",
-  "beim",
-  "wird",
-  "werden",
-  "hat",
-  "haben",
-  "hast",
-  "sehr",
-  "wie",
-  "immer",
-  "noch",
-  "schon",
-  "hier",
-  "dort",
-  "dann",
-  "davon",
-  "damit",
-  "dazu",
-  "bereits",
-  "einfach",
-]);
+type ProjectConfig = {
+  language: "EN" | "DE";
+};
 
-function detectLanguage(text: string): "de" | "en" {
-  const lower = text.toLowerCase();
-
-  // German-specific characters strongly indicate German
-  if (/[äöüß]/.test(lower)) return "de";
-
-  // Count German vs English word matches
-  const words = lower.split(/[^a-zäöüß]+/).filter(Boolean);
-  let germanScore = 0;
-
-  for (const word of words) {
-    if (GERMAN_WORDS.has(word)) germanScore++;
+function readProjectConfig(projectDir: string): ProjectConfig {
+  const configPath = path.join(projectDir, "project.json");
+  if (!fs.existsSync(configPath)) {
+    console.warn(
+      `  [WARN] ${path.basename(projectDir)}: no project.json, defaulting to EN`,
+    );
+    return { language: "EN" };
   }
-
-  return germanScore >= 2 ? "de" : "en";
+  return JSON.parse(fs.readFileSync(configPath, "utf-8")) as ProjectConfig;
 }
 
 async function resolveProfileId(name: string): Promise<string> {
@@ -172,6 +118,10 @@ async function main() {
       .filter((f) => f.endsWith(".txt"))
       .sort();
 
+    const config = readProjectConfig(path.join(PROJECTS_DIR, project));
+    const lang = config.language === "DE" ? "de" : "en";
+    const profileId = lang === "de" ? profileIdDE : profileIdEN;
+
     for (const textFile of textFiles) {
       total++;
       const stem = path.parse(textFile).name;
@@ -200,8 +150,6 @@ async function main() {
         continue;
       }
 
-      const lang = detectLanguage(textContent);
-      const profileId = lang === "de" ? profileIdDE : profileIdEN;
       const outFile = path.join(voicesDir, `${stem}.wav`);
 
       console.log(`  [GEN]  ${project}/${textFile} → ${stem}.wav (${lang})`);
