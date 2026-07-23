@@ -1,4 +1,4 @@
-import { Graphics } from "pixi.js";
+import { Sprite, Texture, CanvasSource } from "pixi.js";
 
 export interface BlobMaskConfig {
   segments: number;
@@ -6,40 +6,76 @@ export interface BlobMaskConfig {
   wobble: number;
   phaseSpread: number;
   subdivisions: number;
+  feather: number;
 }
 
-export class WebcamBlobMask extends Graphics {
+export class WebcamBlobMask extends Sprite {
   private elapsed = 0;
   private config: BlobMaskConfig;
-  private radius = 200;
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
+  private radiusX = 240;
+  private radiusY = 180;
 
-  constructor(config: BlobMaskConfig) {
-    super();
+  constructor(config: BlobMaskConfig, width: number, height: number) {
+    const pad = config.feather + config.wobble * 1.5;
+    const cw = Math.ceil(width + pad * 2);
+    const ch = Math.ceil(height + pad * 2);
+    const canvas = document.createElement("canvas");
+    canvas.width = cw;
+    canvas.height = ch;
+    const ctx = canvas.getContext("2d")!;
+    const source = new CanvasSource({ resource: canvas });
+    const texture = new Texture({ source });
+    super({ texture, anchor: 0.5 });
+    this.canvas = canvas;
+    this.ctx = ctx;
     this.config = config;
+    this.width = width;
+    this.height = height;
+  }
+
+  public setSize(w: number, h: number) {
+    const pad = this.config.feather + this.config.wobble * 1.5;
+    this.canvas.width = Math.ceil(w + pad * 2);
+    this.canvas.height = Math.ceil(h + pad * 2);
+    this.texture.source.resize(this.canvas.width, this.canvas.height);
+    this.texture.source.update();
+    this.width = w;
+    this.height = h;
+  }
+
+  public setRadii(rx: number, ry: number) {
+    this.radiusX = rx;
+    this.radiusY = ry;
   }
 
   public update(dt: number) {
     this.elapsed += dt;
-    this.clear();
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    const { segments, morphSpeed, wobble, phaseSpread, subdivisions } =
+    const { segments, morphSpeed, wobble, phaseSpread, subdivisions, feather } =
       this.config;
     const ctrl: number[] = [];
+    const cx = this.canvas.width / 2;
+    const cy = this.canvas.height / 2;
 
     for (let i = 0; i < segments; i++) {
       const angle = (i / segments) * Math.PI * 2 - Math.PI / 2;
-      const r =
-        this.radius +
+      const wobbleT =
         Math.sin(this.elapsed * morphSpeed + i * phaseSpread) * wobble +
         Math.sin(this.elapsed * morphSpeed * 0.6 + i * phaseSpread * 1.7) *
           (wobble * 0.5) +
         Math.sin(this.elapsed * morphSpeed * 0.3 + i * phaseSpread * 0.4) *
           (wobble * 0.3);
-      ctrl.push(Math.cos(angle) * r, Math.sin(angle) * r);
+      ctrl.push(
+        cx + Math.cos(angle) * (this.radiusX + wobbleT),
+        cy + Math.sin(angle) * (this.radiusY + wobbleT),
+      );
     }
 
-    const verts: number[] = [];
     const n = segments;
+    const verts: number[] = [];
 
     for (let i = 0; i < n; i++) {
       const i0 = ((i - 1 + n) % n) * 2;
@@ -62,11 +98,17 @@ export class WebcamBlobMask extends Graphics {
       }
     }
 
-    this.poly(verts).fill(0xffffff);
-  }
+    this.ctx.filter = `blur(${feather}px)`;
+    this.ctx.fillStyle = "white";
+    this.ctx.beginPath();
+    this.ctx.moveTo(verts[0], verts[1]);
+    for (let i = 2; i < verts.length; i += 2) {
+      this.ctx.lineTo(verts[i], verts[i + 1]);
+    }
+    this.ctx.closePath();
+    this.ctx.fill();
 
-  public setRadius(r: number) {
-    this.radius = r;
+    this.texture.source.update();
   }
 
   private catmullRom(

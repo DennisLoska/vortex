@@ -76,9 +76,13 @@ export class WebcamAsset extends Container {
       this.sprite = new Sprite({ texture, anchor: 0.5 });
       this.addChild(this.sprite);
 
-      this.blobMask = new WebcamBlobMask(webcamConfig.mask.blob);
+      this.blobMask = new WebcamBlobMask(
+        webcamConfig.mask.blob,
+        webcamConfig.mask.width,
+        webcamConfig.mask.height,
+      );
       this.addChild(this.blobMask);
-      this.mask = this.blobMask;
+      this.setMask({ mask: this.blobMask, channel: "alpha" });
 
       this.applyPreset(0);
     } catch (error) {
@@ -140,10 +144,10 @@ export class WebcamAsset extends Container {
 
   private syncMaskRadius() {
     if (!this.sprite || !this.blobMask) return;
-    this.blobMask.setRadius(
-      Math.min(this.sprite.width, this.sprite.height) / 2 -
-        webcamConfig.mask.blob.wobble,
-    );
+    const w = this.sprite.width;
+    const h = this.sprite.height;
+    this.blobMask.setSize(w, h);
+    this.blobMask.setRadii(w * 0.38, h * 0.38);
   }
 
   public update(ticker: Ticker) {

@@ -71,6 +71,7 @@ export const webcamConfig = {
       wobble: 10,
       phaseSpread: 2.5,
       subdivisions: 100,
+      feather: 20,
     },
   },
 };
