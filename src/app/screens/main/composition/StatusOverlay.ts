@@ -46,6 +46,7 @@ export class StatusOverlay extends Container {
   private xpBarFill: Graphics;
   private xpBarText: Text;
   private levelText: Text;
+  private xpContainer: Container;
   private fullHeartTex: Texture;
   private emptyHeartTex: Texture;
 
@@ -76,11 +77,11 @@ export class StatusOverlay extends Container {
     });
     this.xpBarText.anchor.set(0.5);
 
-    const xpContainer = new Container();
-    xpContainer.addChild(this.xpBarBg);
-    xpContainer.addChild(this.xpBarFill);
-    xpContainer.addChild(this.xpBarText);
-    this.addChild(xpContainer);
+    this.xpContainer = new Container();
+    this.xpContainer.addChild(this.xpBarBg);
+    this.xpContainer.addChild(this.xpBarFill);
+    this.xpContainer.addChild(this.xpBarText);
+    this.addChild(this.xpContainer);
 
     this.levelText = new Text({
       text: "",
@@ -119,7 +120,7 @@ export class StatusOverlay extends Container {
 
   private buildXPBar(): void {
     const cfg = this.config.experienceBar;
-    const ratio = Math.min(cfg.current / cfg.max, 1);
+    const ratio = cfg.max > 0 ? Math.min(cfg.current / cfg.max, 1) : 0;
 
     this.xpBarBg.clear();
     if (cfg.width > 0 && cfg.height > 0) {
@@ -139,6 +140,12 @@ export class StatusOverlay extends Container {
     this.levelText.text = `${this.config.level.label} ${this.config.level.current}`;
   }
 
+  public override destroy(options?: any): void {
+    this.fullHeartTex.destroy(true);
+    this.emptyHeartTex.destroy(true);
+    super.destroy(options);
+  }
+
   public resize(width: number, _height: number): void {
     const pad = this.config.padding;
     const hb = this.config.hearts;
@@ -146,9 +153,8 @@ export class StatusOverlay extends Container {
     this.heartsContainer.x = pad;
     this.heartsContainer.y = pad;
 
-    const xpContainer = this.children[1];
-    xpContainer.x = pad;
-    xpContainer.y = pad + hb.size + 12;
+    this.xpContainer.x = pad;
+    this.xpContainer.y = pad + hb.size + 12;
 
     this.levelText.x = width - pad;
     this.levelText.y = pad;
