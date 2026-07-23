@@ -118,15 +118,6 @@ export class WebcamAsset extends Container {
     this.applyPreset(next);
   }
 
-  public jumpToRandomPreset() {
-    this.userPlaced = false;
-    let next = this.currentPresetIndex;
-    while (next === this.currentPresetIndex) {
-      next = Math.floor(Math.random() * webcamPresets.length);
-    }
-    this.applyPreset(next);
-  }
-
   private applyPreset(index: number) {
     this.currentPresetIndex = index;
     const preset = webcamPresets[index];
@@ -167,7 +158,6 @@ export class WebcamAsset extends Container {
     if (!this.userPlaced) {
       this.autoJumpTimer += dt;
       if (this.autoJumpTimer >= this.nextAutoJump) {
-        this.jumpToRandomPreset();
         this.autoJumpTimer = 0;
         this.nextAutoJump = randomFloat(
           webcamConfig.autoJumpInterval.min,
