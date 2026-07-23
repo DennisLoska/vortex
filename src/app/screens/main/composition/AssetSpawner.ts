@@ -2,23 +2,12 @@ import { Assets, Container, Sprite, Texture, VideoSource } from "pixi.js";
 import { GifSprite } from "pixi.js/gif";
 import type { Ticker } from "pixi.js";
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore - dynamically generated file by AssetPack
-import manifest from "../../../../manifest.json";
+import { getProjectAssets, type PoolEntry } from "../../../assetManifest";
 
 import { randomFloat } from "../../../../engine/utils/random";
 import { waitFor } from "../../../../engine/utils/waitFor";
 import { CompositionAsset } from "./CompositionAsset";
 import { compositionConfig, type AnimationProfile } from "./composition.config";
-
-const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".svg"];
-const VIDEO_EXTENSIONS = [".mp4", ".webm", ".m4v", ".ogv", ".mov"];
-const GIF_EXTENSION = ".gif";
-
-type PoolEntry = {
-  key: string;
-  type: "image" | "video" | "gif";
-};
 
 export class AssetSpawner {
   private container: Container;
@@ -115,36 +104,7 @@ export class AssetSpawner {
   }
 
   private buildPool(projectName: string) {
-    this.pool = [];
-    const seen = new Set<string>();
-    const defaultBundle = manifest.bundles.find((b) => b.name === "default");
-    const assets = defaultBundle?.assets ?? [];
-
-    for (const asset of assets) {
-      const srcs = Array.isArray(asset.src) ? asset.src : [asset.src];
-      const firstSrc = srcs[0];
-      const lower = firstSrc.toLowerCase();
-      const aliases = Array.isArray(asset.alias) ? asset.alias : [asset.alias];
-      const key = aliases[0] ?? firstSrc;
-
-      if (seen.has(key)) continue;
-
-      // only include assets from current project
-      if (!key.startsWith(projectName)) continue;
-      // exclude backgrounds — BackgroundLayer handles them
-      if (key.startsWith(`${projectName}/backgrounds/`)) continue;
-
-      if (IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
-        seen.add(key);
-        this.pool.push({ key, type: "image" });
-      } else if (VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
-        seen.add(key);
-        this.pool.push({ key, type: "video" });
-      } else if (lower.endsWith(GIF_EXTENSION)) {
-        seen.add(key);
-        this.pool.push({ key, type: "gif" });
-      }
-    }
+    this.pool = getProjectAssets(projectName);
   }
 
   public setBlockedCell(cellIdx: number) {

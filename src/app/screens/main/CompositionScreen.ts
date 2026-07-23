@@ -1,31 +1,12 @@
 import type { Ticker, Texture } from "pixi.js";
 import { ColorMatrixFilter, Color, Container } from "pixi.js";
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore - dynamically generated file by AssetPack
-import manifest from "../../../manifest.json";
-
 import { engine } from "../../getEngine";
+import { getProjectNames } from "../../assetManifest";
 import { AssetSpawner } from "./composition/AssetSpawner";
 import { BackgroundLayer } from "./composition/BackgroundLayer";
 import { TextOverlay } from "./composition/TextOverlay";
 import { WebcamAsset } from "./composition/WebcamAsset";
-
-function getProjectNames(): string[] {
-  const names = new Set<string>();
-  for (const bundle of manifest.bundles) {
-    for (const asset of bundle.assets) {
-      const srcs = Array.isArray(asset.src) ? asset.src : [asset.src];
-      for (const src of srcs) {
-        const first = src.split("/")[0];
-        if (first) {
-          names.add(first);
-        }
-      }
-    }
-  }
-  return [...names];
-}
 
 let _activeProject: string | null = null;
 
