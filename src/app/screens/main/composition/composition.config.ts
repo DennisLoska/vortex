@@ -95,3 +95,57 @@ export const fonts = {
 };
 
 export type CompositionConfig = typeof compositionConfig;
+
+export interface StatusOverlayConfig {
+  hearts: {
+    count: number;
+    filled: number;
+    size: number;
+    spacing: number;
+    fullColor: number;
+    emptyColor: number;
+  };
+  experienceBar: {
+    current: number;
+    max: number;
+    width: number;
+    height: number;
+    color: number;
+    backgroundColor: number;
+    textColor: number;
+  };
+  level: {
+    current: number;
+    fontSize: number;
+    color: number;
+    label: string;
+  };
+  padding: number;
+}
+
+export const statusOverlayConfig: StatusOverlayConfig = {
+  hearts: {
+    count: 5,
+    filled: 3,
+    size: 24,
+    spacing: 6,
+    fullColor: 0xff0044,
+    emptyColor: 0x333333,
+  },
+  experienceBar: {
+    current: 1,
+    max: 10,
+    width: 220,
+    height: 20,
+    color: 0x00ff88,
+    backgroundColor: 0x222222,
+    textColor: 0xffffff,
+  },
+  level: {
+    current: 1,
+    fontSize: 32,
+    color: 0xffffff,
+    label: "LVL",
+  },
+  padding: 20,
+};
