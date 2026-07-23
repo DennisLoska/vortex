@@ -55,7 +55,7 @@ export const webcamPresets: WebcamPreset[] = [
   { x: 0.4, y: 0.4, scale: 1.2 },
   { x: 0.85, y: 0.65, scale: 0.8 },
   { x: 0.75, y: 0.65, scale: 1.2 },
-  { x: 0.5, y: 0.5, scale: 3.0 },
+  { x: 0.5, y: 0.5, scale: 2.1 },
 ];
 
 export const webcamConfig = {

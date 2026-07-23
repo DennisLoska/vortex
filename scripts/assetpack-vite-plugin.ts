@@ -5,9 +5,9 @@ import { AssetPack } from "@assetpack/core";
 import { pixiPipes } from "@assetpack/core/pixi";
 import type { Plugin } from "vite";
 
-const IMG_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp", ".svg"]);
+const IMG_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif"]);
 const VIDEO_EXTS = new Set([".mp4", ".webm", ".m4v", ".ogv", ".mov"]);
-const TEXT_EXTS = new Set([".txt"]);
+// texts loaded via import.meta.glob in TextOverlay.ts, not manifest
 
 function generateManifest(entry: string): void {
   const bundles: {
@@ -24,8 +24,7 @@ function generateManifest(entry: string): void {
         walk(full, rel);
       } else {
         const ext = path.extname(entry.name).toLowerCase();
-        const keep =
-          IMG_EXTS.has(ext) || VIDEO_EXTS.has(ext) || TEXT_EXTS.has(ext);
+        const keep = IMG_EXTS.has(ext) || VIDEO_EXTS.has(ext);
         if (!keep) continue;
         const alias = [rel];
         if (ext !== ".txt") alias.push(entry.name);

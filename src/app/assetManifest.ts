@@ -41,6 +41,7 @@ export function getProjectAssets(project: string): PoolEntry[] {
     if (seen.has(key)) continue;
     if (!key.startsWith(project)) continue;
     if (key.startsWith(`${project}/backgrounds/`)) continue;
+    if (key.startsWith(`${project}/fix/`)) continue;
 
     if (IMAGE_EXTS.some((ext) => lower.endsWith(ext))) {
       seen.add(key);
@@ -54,6 +55,19 @@ export function getProjectAssets(project: string): PoolEntry[] {
     }
   }
   return pool;
+}
+
+export function getProjectFixAssets(project: string): string[] {
+  const aliases: string[] = [];
+  for (const bundle of manifest.bundles) {
+    for (const asset of bundle.assets) {
+      const firstSrc = asset.src[0];
+      if (!firstSrc.startsWith(`${project}/fix/`)) continue;
+      const alias = asset.alias[0] ?? firstSrc;
+      aliases.push(alias);
+    }
+  }
+  return aliases;
 }
 
 export function getProjectBackgrounds(project: string): {
