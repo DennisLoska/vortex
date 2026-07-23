@@ -18,18 +18,65 @@ if (!VOICEBOX_URL) {
   process.exit(1);
 }
 
-const VOICE_NAME_EN = (process.env.VOICE_ID_EN || "the_narrator_en").toLowerCase();
-const VOICE_NAME_DE = (process.env.VOICE_ID_DE || "the_narrator_de").toLowerCase();
+const VOICE_NAME_EN = (
+  process.env.VOICE_ID_EN || "the_narrator_en"
+).toLowerCase();
+const VOICE_NAME_DE = (
+  process.env.VOICE_ID_DE || "the_narrator_de"
+).toLowerCase();
 
 const PROJECTS_DIR = path.resolve(import.meta.dirname, "..", "projects");
 
 const GERMAN_WORDS = new Set([
-  "der", "die", "das", "und", "ist", "sind", "ein", "eine", "nicht",
-  "sich", "auch", "auf", "für", "mit", "als", "bei", "nach", "aus",
-  "dass", "diese", "durch", "über", "vor", "zwischen", "oder", "aber",
-  "denn", "zum", "zur", "vom", "beim", "wird", "werden", "hat",
-  "haben", "hast", "sehr", "wie", "immer", "noch", "schon", "hier",
-  "dort", "dann", "davon", "damit", "dazu", "bereits", "einfach",
+  "der",
+  "die",
+  "das",
+  "und",
+  "ist",
+  "sind",
+  "ein",
+  "eine",
+  "nicht",
+  "sich",
+  "auch",
+  "auf",
+  "für",
+  "mit",
+  "als",
+  "bei",
+  "nach",
+  "aus",
+  "dass",
+  "diese",
+  "durch",
+  "über",
+  "vor",
+  "zwischen",
+  "oder",
+  "aber",
+  "denn",
+  "zum",
+  "zur",
+  "vom",
+  "beim",
+  "wird",
+  "werden",
+  "hat",
+  "haben",
+  "hast",
+  "sehr",
+  "wie",
+  "immer",
+  "noch",
+  "schon",
+  "hier",
+  "dort",
+  "dann",
+  "davon",
+  "damit",
+  "dazu",
+  "bereits",
+  "einfach",
 ]);
 
 function detectLanguage(text: string): "de" | "en" {
@@ -74,7 +121,9 @@ async function generateVoice(
   });
 
   if (!res.ok) {
-    throw new Error(`Voicebox generate failed: ${res.status} ${res.statusText}`);
+    throw new Error(
+      `Voicebox generate failed: ${res.status} ${res.statusText}`,
+    );
   }
 
   const gen = (await res.json()) as VoiceboxGenerateResponse;
@@ -95,7 +144,8 @@ async function generateVoice(
 const REGENERATE = process.argv.includes("--regenerate");
 
 async function main() {
-  const projects = fs.readdirSync(PROJECTS_DIR, { withFileTypes: true })
+  const projects = fs
+    .readdirSync(PROJECTS_DIR, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => d.name);
 
@@ -117,7 +167,8 @@ async function main() {
       fs.mkdirSync(voicesDir, { recursive: true });
     }
 
-    const textFiles = fs.readdirSync(textsDir)
+    const textFiles = fs
+      .readdirSync(textsDir)
       .filter((f) => f.endsWith(".txt"))
       .sort();
 
@@ -125,7 +176,8 @@ async function main() {
       total++;
       const stem = path.parse(textFile).name;
       const prefix = stem.split("_")[0];
-      const existingVoiceFiles = fs.readdirSync(voicesDir)
+      const existingVoiceFiles = fs
+        .readdirSync(voicesDir)
         .filter((f) => f.startsWith(prefix));
 
       if (existingVoiceFiles.length > 0 && !REGENERATE) {
@@ -139,7 +191,9 @@ async function main() {
         }
       }
 
-      const textContent = fs.readFileSync(path.join(textsDir, textFile), "utf-8").trim();
+      const textContent = fs
+        .readFileSync(path.join(textsDir, textFile), "utf-8")
+        .trim();
       if (!textContent) {
         console.warn(`  [SKIP] ${project}/${textFile} — empty`);
         skipped++;
@@ -163,7 +217,9 @@ async function main() {
     }
   }
 
-  console.log(`\nDone. ${total} texts, ${generated} generated, ${skipped} skipped, ${errors} errors`);
+  console.log(
+    `\nDone. ${total} texts, ${generated} generated, ${skipped} skipped, ${errors} errors`,
+  );
 }
 
 main().catch((err) => {

@@ -11,7 +11,6 @@ import { WebcamAsset } from "./composition/WebcamAsset";
 let _activeProject: string | null = null;
 
 export class CompositionScreen extends Container {
-
   private background: BackgroundLayer;
   private assetLayer: Container;
   private spawner: AssetSpawner;
@@ -103,8 +102,6 @@ export class CompositionScreen extends Container {
     engine().audio.bgm.play("main/sounds/bgm-main.mp3", { volume: 0.5 });
     this.spawner.start(this.bounds);
   }
-
-
 
   public update(ticker: Ticker) {
     if (this.paused) return;
