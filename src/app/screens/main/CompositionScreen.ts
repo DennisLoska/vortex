@@ -5,7 +5,9 @@ import { engine } from "../../getEngine";
 import { getProjectNames } from "../../assetManifest";
 import { AssetSpawner } from "./composition/AssetSpawner";
 import { BackgroundLayer } from "./composition/BackgroundLayer";
+import { FixedAssetLayer } from "./composition/FixedAssetLayer";
 import { TextOverlay } from "./composition/TextOverlay";
+import { StatusOverlay } from "./composition/StatusOverlay";
 import { WebcamAsset } from "./composition/WebcamAsset";
 
 let _activeProject: string | null = null;
@@ -14,7 +16,9 @@ export class CompositionScreen extends Container {
   private background: BackgroundLayer;
   private assetLayer: Container;
   private spawner: AssetSpawner;
+  private fixedLayer: FixedAssetLayer;
   private textOverlay: TextOverlay;
+  private statusOverlay: StatusOverlay;
   private webcam: WebcamAsset;
   private bounds = { width: 1920, height: 1080 };
   private paused = false;
@@ -40,12 +44,18 @@ export class CompositionScreen extends Container {
     this.spawner = new AssetSpawner(this.assetLayer);
     this.spawner.setProject(this.currentProject);
 
+    this.fixedLayer = new FixedAssetLayer();
+    this.addChild(this.fixedLayer);
+
     this.webcam = new WebcamAsset();
     this.addChild(this.webcam);
 
     this.textOverlay = new TextOverlay();
     this.textOverlay.setProject(this.currentProject);
     this.addChild(this.textOverlay);
+
+    this.statusOverlay = new StatusOverlay();
+    this.addChild(this.statusOverlay);
 
     this.setupKeyboard();
 
@@ -60,6 +70,7 @@ export class CompositionScreen extends Container {
     this.background.onNewBackground = (texture) => {
       this.extractAndApplyTheme(texture);
     };
+    await this.fixedLayer.setProject(this.currentProject);
     await this.textOverlay.loadPhrases();
     await this.textOverlay.loadVoices();
     if (!this.webcamInitialized) {
@@ -148,7 +159,9 @@ export class CompositionScreen extends Container {
   public resize(width: number, height: number) {
     this.bounds = { width, height };
     this.background.resize(width, height);
+    this.fixedLayer.resize(width, height);
     this.textOverlay.resize(width, height);
+    this.statusOverlay.resize(width, height);
     this.webcam.resize(this.bounds);
   }
 
@@ -156,6 +169,7 @@ export class CompositionScreen extends Container {
     this.paused = false;
     this.spawner.stop();
     this.spawner.clear();
+    this.fixedLayer.clear();
   }
 
   private async switchProject(name: string) {
@@ -164,6 +178,7 @@ export class CompositionScreen extends Container {
     this.currentProject = name;
     this.spawner.setProject(name);
     this.textOverlay.setProject(name);
+    this.fixedLayer.clear();
     this.background.removeChildren();
     await this.prepare();
     await this.show();
