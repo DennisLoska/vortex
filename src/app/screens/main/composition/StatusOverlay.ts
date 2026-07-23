@@ -1,15 +1,16 @@
-import { Container, Graphics, Text, CanvasSource, Texture, Sprite } from "pixi.js";
+import {
+  Container,
+  Graphics,
+  Text,
+  CanvasSource,
+  Texture,
+  Sprite,
+} from "pixi.js";
 import { statusOverlayConfig, StatusOverlayConfig } from "./composition.config";
 
 const HEART_PIXEL_DATA = [
-  0b0011001100,
-  0b0111111110,
-  0b1111111111,
-  0b1111111111,
-  0b0111111110,
-  0b0011111100,
-  0b0001111000,
-  0b0000110000,
+  0b0011001100, 0b0111111110, 0b1111111111, 0b1111111111, 0b0111111110,
+  0b0011111100, 0b0001111000, 0b0000110000,
 ];
 
 const HEART_WIDTH = 10;
@@ -108,7 +109,8 @@ export class StatusOverlay extends Container {
     this.heartsContainer.removeChildren();
 
     for (let i = 0; i < this.config.hearts.count; i++) {
-      const tex = i < this.config.hearts.filled ? this.fullHeartTex : this.emptyHeartTex;
+      const tex =
+        i < this.config.hearts.filled ? this.fullHeartTex : this.emptyHeartTex;
       const sprite = new Sprite({
         texture: tex,
         scale: this.config.hearts.size / HEART_WIDTH,
@@ -124,13 +126,17 @@ export class StatusOverlay extends Container {
 
     this.xpBarBg.clear();
     if (cfg.width > 0 && cfg.height > 0) {
-      this.xpBarBg.roundRect(0, 0, cfg.width, cfg.height, 4).fill({ color: cfg.backgroundColor });
+      this.xpBarBg
+        .roundRect(0, 0, cfg.width, cfg.height, 4)
+        .fill({ color: cfg.backgroundColor });
     }
 
     this.xpBarFill.clear();
     const fillWidth = cfg.width * ratio;
     if (fillWidth > 0 && cfg.height > 0) {
-      this.xpBarFill.roundRect(0, 0, fillWidth, cfg.height, 4).fill({ color: cfg.color });
+      this.xpBarFill
+        .roundRect(0, 0, fillWidth, cfg.height, 4)
+        .fill({ color: cfg.color });
     }
 
     this.xpBarText.text = `${cfg.current} / ${cfg.max}`;
@@ -140,13 +146,17 @@ export class StatusOverlay extends Container {
     this.levelText.text = `${this.config.level.label} ${this.config.level.current}`;
   }
 
-  public override destroy(options?: any): void {
+  public override destroy(options?: {
+    children?: boolean;
+    texture?: boolean;
+  }): void {
     this.fullHeartTex.destroy(true);
     this.emptyHeartTex.destroy(true);
     super.destroy(options);
   }
 
   public resize(width: number, _height: number): void {
+    void _height;
     const pad = this.config.padding;
     const hb = this.config.hearts;
 
