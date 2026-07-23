@@ -61,14 +61,17 @@ export const webcamPresets: WebcamPreset[] = [
 export const webcamConfig = {
   autoJumpInterval: { min: 30, max: 60 },
   mask: {
-    cornerRadius: 24,
     width: 480,
     height: 360,
     idleScalePulse: { min: 0.92, max: 1.08 },
     idleRotationRange: 3,
-    idleCycle: 5,
-    edgeFadeRadius: 60,
-    displacementScale: 15,
+    blob: {
+      segments: 20,
+      morphSpeed: 1.0,
+      wobble: 10,
+      phaseSpread: 2.5,
+      subdivisions: 100,
+    },
   },
 };
 

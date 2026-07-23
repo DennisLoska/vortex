@@ -3,6 +3,7 @@ import { Container, Sprite, Texture, VideoSource } from "pixi.js";
 
 import { randomFloat } from "../../../../engine/utils/random";
 import { webcamConfig, webcamPresets } from "./composition.config";
+import { WebcamBlobMask } from "./WebcamBlobMask";
 
 export class WebcamAsset extends Container {
   private videoElement: HTMLVideoElement | undefined;
@@ -17,6 +18,7 @@ export class WebcamAsset extends Container {
   private idleTime = 0;
   private userPlaced = false;
   private animationPaused = false;
+  private blobMask!: WebcamBlobMask;
 
   public toggleAnimation() {
     this.animationPaused = !this.animationPaused;
@@ -73,6 +75,11 @@ export class WebcamAsset extends Container {
       const texture = new Texture({ source });
       this.sprite = new Sprite({ texture, anchor: 0.5 });
       this.addChild(this.sprite);
+
+      this.blobMask = new WebcamBlobMask(webcamConfig.mask.blob);
+      this.addChild(this.blobMask);
+      this.mask = this.blobMask;
+
       this.applyPreset(0);
     } catch (error) {
       console.warn("Webcam access denied or unavailable:", error);
@@ -128,6 +135,15 @@ export class WebcamAsset extends Container {
       this.sprite.width = w;
       this.sprite.height = h;
     }
+    this.syncMaskRadius();
+  }
+
+  private syncMaskRadius() {
+    if (!this.sprite || !this.blobMask) return;
+    this.blobMask.setRadius(
+      Math.min(this.sprite.width, this.sprite.height) / 2 -
+        webcamConfig.mask.blob.wobble,
+    );
   }
 
   public update(ticker: Ticker) {
@@ -135,6 +151,8 @@ export class WebcamAsset extends Container {
     this.idleTime += dt;
 
     if (!this.sprite || !this.sprite.texture) return;
+
+    this.blobMask.update(dt);
 
     if (this.animationPaused) return;
 
