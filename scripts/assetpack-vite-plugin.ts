@@ -3,14 +3,17 @@ import * as fs from "node:fs";
 import type { AssetPackConfig } from "@assetpack/core";
 import { AssetPack } from "@assetpack/core";
 import { pixiPipes } from "@assetpack/core/pixi";
-import type { Plugin, ResolvedConfig } from "vite";
+import type { Plugin } from "vite";
 
 const IMG_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp", ".svg"]);
 const VIDEO_EXTS = new Set([".mp4", ".webm", ".m4v", ".ogv", ".mov"]);
 const TEXT_EXTS = new Set([".txt"]);
 
 function generateManifest(entry: string): void {
-  const bundles: { name: string; assets: { alias: string[]; src: string[] }[] }[] = [];
+  const bundles: {
+    name: string;
+    assets: { alias: string[]; src: string[] }[];
+  }[] = [];
   const assets: { alias: string[]; src: string[] }[] = [];
 
   function walk(dir: string, prefix: string): void {
@@ -21,7 +24,8 @@ function generateManifest(entry: string): void {
         walk(full, rel);
       } else {
         const ext = path.extname(entry.name).toLowerCase();
-        const keep = IMG_EXTS.has(ext) || VIDEO_EXTS.has(ext) || TEXT_EXTS.has(ext);
+        const keep =
+          IMG_EXTS.has(ext) || VIDEO_EXTS.has(ext) || TEXT_EXTS.has(ext);
         if (!keep) continue;
         const alias = [rel];
         if (ext !== ".txt") alias.push(entry.name);
@@ -37,7 +41,10 @@ function generateManifest(entry: string): void {
 
 function fastCopy(src: string, dest: string): void {
   if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true });
-  fs.cpSync(src, dest, { recursive: true, filter: (f) => !f.endsWith("prompt.txt") });
+  fs.cpSync(src, dest, {
+    recursive: true,
+    filter: (f) => !f.endsWith("prompt.txt"),
+  });
 }
 
 export function assetpackPlugin() {
