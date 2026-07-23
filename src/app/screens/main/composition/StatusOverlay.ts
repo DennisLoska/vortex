@@ -140,6 +140,8 @@ export class StatusOverlay extends Container {
     }
 
     this.xpBarText.text = `${cfg.current} / ${cfg.max}`;
+    this.xpBarText.x = cfg.width / 2;
+    this.xpBarText.y = cfg.height / 2;
   }
 
   private buildLevel(): void {
