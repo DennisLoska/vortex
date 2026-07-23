@@ -1,8 +1,6 @@
-import { Container, Sprite, Texture } from "pixi.js";
+import { Assets, Container, Sprite, Texture, VideoSource } from "pixi.js";
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore - dynamically generated file by AssetPack
-import manifest from "../../../../manifest.json";
+import { getProjectBackgrounds } from "../../../assetManifest";
 
 export class BackgroundLayer extends Container {
   private activeSprite: Sprite | null = null;
@@ -35,38 +33,56 @@ export class BackgroundLayer extends Container {
     const gen = this.loadGen;
     this.textures = [];
     this.videos = [];
-    const videoUrls: string[] = [];
-    const imageUrls: string[] = [];
 
-    for (const bundle of manifest.bundles) {
-      for (const asset of bundle.assets) {
-        const srcs = Array.isArray(asset.src) ? asset.src : [asset.src];
-        const firstSrc = srcs[0];
-        if (!firstSrc.startsWith(`${projectName}/backgrounds/`)) continue;
+    const { videoAliases, imageAliases } = getProjectBackgrounds(projectName);
+    const allAliases = [...videoAliases, ...imageAliases];
 
-        const aliases = Array.isArray(asset.alias)
-          ? asset.alias
-          : [asset.alias];
-        const ext = firstSrc.split(".").pop()?.toLowerCase();
+    if (allAliases.length === 0) return;
 
-        if (ext === "mp4" || ext === "webm" || ext === "ogg") {
-          videoUrls.push(aliases[0] ?? firstSrc);
-        } else if (
-          ext === "png" ||
-          ext === "jpg" ||
-          ext === "jpeg" ||
-          ext === "webp"
-        ) {
-          imageUrls.push(aliases[0] ?? firstSrc);
+    const concurrency = 5;
+    const timeoutMs = 8000;
+
+    const loadAsset = async (alias: string) => {
+      const result = await Promise.race([
+        Assets.load(alias),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), timeoutMs),
+        ),
+      ]);
+      if (gen !== this.loadGen) return null;
+      return result as Texture;
+    };
+
+    let idx = 0;
+    const workers = Array.from({ length: concurrency }, async () => {
+      while (idx < allAliases.length) {
+        const alias = allAliases[idx++];
+        try {
+          const tex = await loadAsset(alias);
+          if (!tex) continue;
+
+          this.textures.push(tex);
+
+          const source = tex.source;
+          if (source instanceof VideoSource) {
+            const videoEl = source.resource as HTMLVideoElement;
+            if (videoEl) {
+              videoEl.loop = true;
+              videoEl.muted = true;
+              videoEl.playsInline = true;
+              this.videos.push(videoEl);
+              void videoEl.play();
+            }
+          }
+        } catch {
+          // individual asset failures don't block
         }
       }
-    }
+    });
 
-    this.loadAllInBackground(videoUrls, imageUrls, gen);
+    await Promise.all(workers);
 
-    while (this.textures.length === 0) {
-      await new Promise((r) => setTimeout(r, 100));
-    }
+    if (this.textures.length === 0) return;
 
     this.currentIdx = 0;
 
@@ -82,71 +98,6 @@ export class BackgroundLayer extends Container {
     this.fadeInAlpha = 0;
     this.autoTimer = 0;
     this.nextAutoDelay = 999;
-  }
-
-  private async loadAllInBackground(videoUrls: string[], imageUrls: string[], gen: number) {
-    const timeout = (ms: number) =>
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("timeout")), ms),
-      );
-
-    const concurrency = 5;
-
-    const loadVideo = async (url: string) => {
-      const video = document.createElement("video");
-      video.src = `/assets/${url}`;
-      video.loop = true;
-      video.muted = true;
-      video.playsInline = true;
-
-      await Promise.race([
-        new Promise<void>((resolve, reject) => {
-          video.addEventListener("loadedmetadata", () => resolve(), {
-            once: true,
-          });
-          video.addEventListener("error", () => reject(), { once: true });
-          video.load();
-        }),
-        timeout(8000),
-      ]);
-
-      if (gen !== this.loadGen) return;
-      const tex = Texture.from(video);
-      this.videos.push(video);
-      this.textures.push(tex);
-      void video.play();
-    };
-
-    const loadImage = async (path: string) => {
-      const url = `/assets/${path}`;
-      const img = new Image();
-      img.src = url;
-      await Promise.race([img.decode(), timeout(8000)]);
-      if (gen !== this.loadGen) return;
-      const tex = Texture.from(img);
-      this.textures.push(tex);
-    };
-
-    const batchLoad = async <T>(
-      items: T[],
-      loader: (item: T) => Promise<void>,
-    ) => {
-      let idx = 0;
-      const workers = Array.from({ length: concurrency }, async () => {
-        while (idx < items.length) {
-          const item = items[idx++];
-          try {
-            await loader(item);
-          } catch {
-            // individual failures don't stop the batch
-          }
-        }
-      });
-      await Promise.all(workers);
-    };
-
-    await batchLoad(videoUrls, loadVideo);
-    await batchLoad(imageUrls, loadImage);
   }
 
   public resize(width: number, height: number) {
@@ -272,13 +223,9 @@ export class BackgroundLayer extends Container {
   }
 
   private getVideoForSprite(sprite: Sprite): HTMLVideoElement | undefined {
-    for (const video of this.videos) {
-      const tex = Texture.from(video);
-      if (tex === sprite.texture || tex.source === sprite.texture?.source) {
-        return video;
-      }
-    }
-    return undefined;
+    const source = sprite.texture.source;
+    if (!(source instanceof VideoSource)) return undefined;
+    return this.videos.find((v) => source.resource === v);
   }
 
   private transitionToRandom() {
