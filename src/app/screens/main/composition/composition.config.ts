@@ -125,8 +125,8 @@ export interface StatusOverlayConfig {
 
 export const statusOverlayConfig: StatusOverlayConfig = {
   hearts: {
-    count: 5,
-    filled: 3,
+    count: 3,
+    filled: 1,
     size: 24,
     spacing: 6,
     fullColor: 0xff0044,
@@ -137,7 +137,7 @@ export const statusOverlayConfig: StatusOverlayConfig = {
     max: 10,
     width: 220,
     height: 20,
-    color: 0x00ff88,
+    color: 0x00cc66,
     backgroundColor: 0x222222,
     textColor: 0xffffff,
   },
