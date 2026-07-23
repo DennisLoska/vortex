@@ -1,7 +1,11 @@
 import type { Container, Ticker } from "pixi.js";
 
 import { randomFloat } from "../../../../engine/utils/random";
-import { animationProfiles, type AnimationProfile } from "./composition.config";
+import {
+  animationProfiles,
+  GRID_PADDING,
+  type AnimationProfile,
+} from "./composition.config";
 
 export class CompositionAsset {
   public view: Container;
@@ -19,13 +23,17 @@ export class CompositionAsset {
   private scalePhase: number;
   private rotationPhase: number;
 
+  private onDispose?: () => void;
+
   constructor(
     view: Container,
     bounds: { width: number; height: number },
     profile: AnimationProfile,
     startX?: number,
     startY?: number,
+    onDispose?: () => void,
   ) {
+    this.onDispose = onDispose;
     this.view = view;
     this.profile = profile;
 
@@ -33,10 +41,18 @@ export class CompositionAsset {
     this.lifetime = randomFloat(config.lifetime.min, config.lifetime.max);
     this.fadeDuration = config.fadeDuration;
 
-    const pad = 350;
-    this.startX = startX ?? randomFloat(pad, Math.max(pad, bounds.width - pad));
+    this.startX =
+      startX ??
+      randomFloat(
+        GRID_PADDING,
+        Math.max(GRID_PADDING, bounds.width - GRID_PADDING),
+      );
     this.startY =
-      startY ?? randomFloat(pad, Math.max(pad, bounds.height - pad));
+      startY ??
+      randomFloat(
+        GRID_PADDING,
+        Math.max(GRID_PADDING, bounds.height - GRID_PADDING),
+      );
     this.startScale = 0.5 + Math.random() * 0.5;
     this.startRotation =
       (Math.random() - 0.5) * 2 * (config.rotationRange * (Math.PI / 180));
@@ -127,6 +143,7 @@ export class CompositionAsset {
   public dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.onDispose?.();
     this.view.removeFromParent();
     this.view.destroy({ children: true });
   }

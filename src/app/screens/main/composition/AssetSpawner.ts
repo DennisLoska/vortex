@@ -7,7 +7,11 @@ import { getProjectAssets, type PoolEntry } from "../../../assetManifest";
 import { randomFloat } from "../../../../engine/utils/random";
 import { waitFor } from "../../../../engine/utils/waitFor";
 import { CompositionAsset } from "./CompositionAsset";
-import { compositionConfig, type AnimationProfile } from "./composition.config";
+import {
+  compositionConfig,
+  GRID_PADDING,
+  type AnimationProfile,
+} from "./composition.config";
 
 export class AssetSpawner {
   private container: Container;
@@ -36,6 +40,7 @@ export class AssetSpawner {
   }
 
   public async start(bounds: { width: number; height: number }) {
+    if (this.running) return;
     this.running = true;
     while (this.running) {
       if (!this.paused) {
@@ -88,7 +93,6 @@ export class AssetSpawner {
           this.occupiedCells.delete(cellIdx);
           this.assetCellMap.delete(asset);
         }
-        this.container.removeChild(asset.view);
         this.assets.splice(i, 1);
       }
     }
@@ -97,7 +101,6 @@ export class AssetSpawner {
       const asset = this.dyingAssets[i];
       asset.update(ticker, bounds, globalTime);
       if (asset.isDead) {
-        this.container.removeChild(asset.view);
         this.dyingAssets.splice(i, 1);
       }
     }
@@ -127,21 +130,27 @@ export class AssetSpawner {
         ? freeCells[Math.floor(Math.random() * freeCells.length)]
         : -1;
 
-    this.occupiedCells.add(cellIdx);
+    if (cellIdx >= 0) {
+      this.occupiedCells.add(cellIdx);
+    }
 
-    const padX = 350;
-    const padY = 350;
-    const areaW = Math.max(1, bounds.width - padX * 2);
-    const areaH = Math.max(1, bounds.height - padY * 2);
+    const areaW = Math.max(1, bounds.width - GRID_PADDING * 2);
+    const areaH = Math.max(1, bounds.height - GRID_PADDING * 2);
     const col = cellIdx % this.gridCols;
     const row = Math.floor(cellIdx / this.gridCols);
     const cellW = areaW / this.gridCols;
     const cellH = areaH / this.gridRows;
 
     const x =
-      padX + cellW * col + cellW * 0.5 + (Math.random() - 0.5) * cellW * 0.4;
+      GRID_PADDING +
+      cellW * col +
+      cellW * 0.5 +
+      (Math.random() - 0.5) * cellW * 0.4;
     const y =
-      padY + cellH * row + cellH * 0.5 + (Math.random() - 0.5) * cellH * 0.4;
+      GRID_PADDING +
+      cellH * row +
+      cellH * 0.5 +
+      (Math.random() - 0.5) * cellH * 0.4;
 
     return { x, y, cellIdx };
   }
@@ -161,7 +170,17 @@ export class AssetSpawner {
       }
     }
 
-    const { view, profile } = await this.createView();
+    let result: {
+      view: Container | null;
+      profile: AnimationProfile;
+      cleanup?: () => void;
+    };
+    try {
+      result = await this.createView();
+    } catch {
+      return;
+    }
+    const { view, profile, cleanup } = result;
     if (!view) return;
 
     const gridPos = this.pickGridCell(bounds);
@@ -171,14 +190,14 @@ export class AssetSpawner {
       profile,
       gridPos.x,
       gridPos.y,
+      cleanup,
     );
     this.assetCellMap.set(asset, gridPos.cellIdx);
     this.container.addChild(view);
 
     if (this.overlapsAny(view)) {
-      this.container.removeChild(view);
-      view.destroy({ children: true });
       this.assetCellMap.delete(asset);
+      asset.dispose();
       return;
     }
 
@@ -202,33 +221,48 @@ export class AssetSpawner {
   }
 
   private async createView(): Promise<{
-    view: Container;
+    view: Container | null;
     profile: AnimationProfile;
+    cleanup?: () => void;
   }> {
-    const entry = this.pool[Math.floor(Math.random() * this.pool.length)];
+    try {
+      const entry = this.pool[Math.floor(Math.random() * this.pool.length)];
 
-    if (entry.type === "gif") {
-      const source = await Assets.load(entry.key);
-      const gif = new GifSprite({ source, autoPlay: true });
-      gif.anchor.set(0.5);
-      gif.scale.set(0.35 + Math.random() * 0.4);
-      return { view: gif, profile: "pop" };
-    }
+      if (entry.type === "gif") {
+        const source = await Assets.load(entry.key);
+        const gif = new GifSprite({ source, autoPlay: true });
+        gif.anchor.set(0.5);
+        gif.scale.set(0.35 + Math.random() * 0.4);
+        return { view: gif, profile: "pop" };
+      }
 
-    if (entry.type === "video") {
+      if (entry.type === "video") {
+        const texture = await Assets.load<Texture>(entry.key);
+        const source = texture.source as VideoSource;
+        const videoElement = source?.resource;
+        if (videoElement) {
+          videoElement.loop = true;
+          videoElement.play();
+        } else {
+          console.warn("Video resource not ready:", entry.key);
+        }
+        const video = new Sprite({ texture, anchor: 0.5 });
+        video.scale.set(0.35 + Math.random() * 0.4);
+        const cleanup = () => {
+          if (videoElement && !videoElement.paused) {
+            videoElement.pause();
+          }
+        };
+        return { view: video, profile: "gentle", cleanup };
+      }
+
       const texture = await Assets.load<Texture>(entry.key);
-      const source = texture.source as VideoSource;
-      const videoElement = source.resource;
-      videoElement.loop = true;
-      videoElement?.play?.();
-      const video = new Sprite({ texture, anchor: 0.5 });
-      video.scale.set(0.35 + Math.random() * 0.4);
-      return { view: video, profile: "gentle" };
+      const sprite = new Sprite({ texture, anchor: 0.5 });
+      sprite.scale.set(0.35 + Math.random() * 0.4);
+      return { view: sprite, profile: "gentle" };
+    } catch (err) {
+      console.error("Failed to create asset view:", err);
+      return { view: null, profile: "gentle" };
     }
-
-    const texture = await Assets.load<Texture>(entry.key);
-    const sprite = new Sprite({ texture, anchor: 0.5 });
-    sprite.scale.set(0.35 + Math.random() * 0.4);
-    return { view: sprite, profile: "gentle" };
   }
 }

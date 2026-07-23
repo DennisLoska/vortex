@@ -77,6 +77,8 @@ export const webcamConfig = {
   },
 };
 
+export const GRID_PADDING = 350;
+
 export const compositionConfig = {
   spawnInterval: { min: 7, max: 12 },
   maxAssets: 2,
