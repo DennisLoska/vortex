@@ -15,9 +15,49 @@ export class WebcamAsset extends Container {
     webcamConfig.autoJumpInterval.max,
   );
   private idleTime = 0;
+  private userPlaced = false;
+  private animationPaused = false;
+
+  public toggleAnimation() {
+    this.animationPaused = !this.animationPaused;
+  }
 
   constructor() {
     super();
+    this.setupDrag();
+  }
+
+  private setupDrag() {
+    this.eventMode = "static";
+    this.cursor = "grab";
+    let dragging = false;
+    let dragOffset = { x: 0, y: 0 };
+
+    this.on("pointerdown", (e) => {
+      dragging = true;
+      this.cursor = "grabbing";
+      this.userPlaced = true;
+      const parent = this.parent;
+      if (!parent) return;
+      const pos = parent.toLocal(e.global);
+      dragOffset = { x: this.x - pos.x, y: this.y - pos.y };
+    });
+
+    this.on("globalpointermove", (e) => {
+      if (!dragging) return;
+      const parent = this.parent;
+      if (!parent) return;
+      const pos = parent.toLocal(e.global);
+      this.x = pos.x + dragOffset.x;
+      this.y = pos.y + dragOffset.y;
+    });
+
+    const stopDrag = () => {
+      dragging = false;
+      this.cursor = "grab";
+    };
+    this.on("pointerup", stopDrag);
+    this.on("pointerupoutside", stopDrag);
   }
 
   public async init() {
@@ -62,11 +102,13 @@ export class WebcamAsset extends Container {
   }
 
   public nextPreset() {
+    this.userPlaced = false;
     const next = (this.currentPresetIndex + 1) % webcamPresets.length;
     this.applyPreset(next);
   }
 
   public jumpToRandomPreset() {
+    this.userPlaced = false;
     let next = this.currentPresetIndex;
     while (next === this.currentPresetIndex) {
       next = Math.floor(Math.random() * webcamPresets.length);
@@ -94,6 +136,8 @@ export class WebcamAsset extends Container {
 
     if (!this.sprite || !this.sprite.texture) return;
 
+    if (this.animationPaused) return;
+
     const maskCfg = webcamConfig.mask;
 
     // organic breathing scale — multi-frequency sine waves
@@ -115,15 +159,17 @@ export class WebcamAsset extends Container {
       Math.sin(this.idleTime * 0.35 + 1.8) * (maskCfg.idleRotationRange * 0.4);
     this.rotation = ((rot1 + rot2) / 180) * Math.PI;
 
-    // auto-jump timer
-    this.autoJumpTimer += dt;
-    if (this.autoJumpTimer >= this.nextAutoJump) {
-      this.jumpToRandomPreset();
-      this.autoJumpTimer = 0;
-      this.nextAutoJump = randomFloat(
-        webcamConfig.autoJumpInterval.min,
-        webcamConfig.autoJumpInterval.max,
-      );
+    // auto-jump timer — disabled after manual drag
+    if (!this.userPlaced) {
+      this.autoJumpTimer += dt;
+      if (this.autoJumpTimer >= this.nextAutoJump) {
+        this.jumpToRandomPreset();
+        this.autoJumpTimer = 0;
+        this.nextAutoJump = randomFloat(
+          webcamConfig.autoJumpInterval.min,
+          webcamConfig.autoJumpInterval.max,
+        );
+      }
     }
   }
 }

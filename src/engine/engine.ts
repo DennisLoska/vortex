@@ -48,7 +48,6 @@ export class CreationEngine extends Application {
 
     // Init PixiJS assets with this asset manifest
     await Assets.init({ manifest, basePath: "assets" });
-    await Assets.loadBundle("preload");
 
     // List all existing bundles names
     const allBundles = manifest.bundles.map((item) => item.name);

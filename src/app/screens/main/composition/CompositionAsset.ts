@@ -37,7 +37,7 @@ export class CompositionAsset {
     this.startX = startX ?? randomFloat(pad, Math.max(pad, bounds.width - pad));
     this.startY =
       startY ?? randomFloat(pad, Math.max(pad, bounds.height - pad));
-    this.startScale = 0.25 + Math.random() * 0.5;
+    this.startScale = 0.5 + Math.random() * 0.5;
     this.startRotation =
       (Math.random() - 0.5) * 2 * (config.rotationRange * (Math.PI / 180));
     this.driftAngle = Math.random() * Math.PI * 2;
@@ -65,26 +65,31 @@ export class CompositionAsset {
     const config = animationProfiles[this.profile];
 
     if (config.driftSpeed.max > 0) {
-      const driftX = Math.cos(this.driftAngle) * this.driftSpeed * this.age;
-      const driftY = Math.sin(this.driftAngle) * this.driftSpeed * this.age;
-      this.view.x = Math.max(
-        50,
-        Math.min(bounds.width - 50, this.startX + driftX),
-      );
-      this.view.y = Math.max(
-        50,
-        Math.min(bounds.height - 50, this.startY + driftY),
-      );
+      if (this.dying) {
+        this.view.x = this.frozenX;
+        this.view.y = this.frozenY;
+      } else {
+        const driftX = Math.cos(this.driftAngle) * this.driftSpeed * this.age;
+        const driftY = Math.sin(this.driftAngle) * this.driftSpeed * this.age;
+        this.view.x = Math.max(
+          50,
+          Math.min(bounds.width - 50, this.startX + driftX),
+        );
+        this.view.y = Math.max(
+          50,
+          Math.min(bounds.height - 50, this.startY + driftY),
+        );
+      }
     }
 
-    if (config.scalePulse.max !== config.scalePulse.min) {
+    if (config.scalePulse.max !== config.scalePulse.min && !this.dying) {
       const pulse = Math.sin(globalTime * 0.8 + this.scalePhase);
       const range = (config.scalePulse.max - config.scalePulse.min) / 2;
       const mid = (config.scalePulse.max + config.scalePulse.min) / 2;
       this.view.scale.set(this.startScale * (mid + pulse * range));
     }
 
-    if (config.rotationRange > 0) {
+    if (config.rotationRange > 0 && !this.dying) {
       const wobble = Math.sin(globalTime * 0.5 + this.rotationPhase);
       const rotationRad = wobble * config.rotationRange * (Math.PI / 180);
       this.view.rotation = this.startRotation + rotationRad;
@@ -108,7 +113,14 @@ export class CompositionAsset {
     }
   }
 
+  private dying = false;
+  private frozenX = 0;
+  private frozenY = 0;
+
   public startDying() {
+    this.dying = true;
+    this.frozenX = this.view.x;
+    this.frozenY = this.view.y;
     this.age = Math.max(this.age, this.lifetime - this.fadeDuration);
   }
 

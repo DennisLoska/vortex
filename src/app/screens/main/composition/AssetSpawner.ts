@@ -2,23 +2,12 @@ import { Assets, Container, Sprite, Texture, VideoSource } from "pixi.js";
 import { GifSprite } from "pixi.js/gif";
 import type { Ticker } from "pixi.js";
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore - dynamically generated file by AssetPack
-import manifest from "../../../../manifest.json";
+import { getProjectAssets, type PoolEntry } from "../../../assetManifest";
 
 import { randomFloat } from "../../../../engine/utils/random";
 import { waitFor } from "../../../../engine/utils/waitFor";
 import { CompositionAsset } from "./CompositionAsset";
 import { compositionConfig, type AnimationProfile } from "./composition.config";
-
-const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".svg"];
-const VIDEO_EXTENSIONS = [".mp4", ".webm", ".m4v", ".ogv", ".mov"];
-const GIF_EXTENSION = ".gif";
-
-type PoolEntry = {
-  key: string;
-  type: "image" | "video" | "gif";
-};
 
 export class AssetSpawner {
   private container: Container;
@@ -36,11 +25,14 @@ export class AssetSpawner {
 
   constructor(container: Container) {
     this.container = container;
-    this.buildPool();
   }
 
   public get isPaused() {
     return this.paused;
+  }
+
+  public setProject(projectName: string) {
+    this.buildPool(projectName);
   }
 
   public async start(bounds: { width: number; height: number }) {
@@ -78,6 +70,8 @@ export class AssetSpawner {
     }
     this.assets = [];
     this.dyingAssets = [];
+    this.occupiedCells.clear();
+    this.blockedCell = -1;
   }
 
   public update(
@@ -109,34 +103,8 @@ export class AssetSpawner {
     }
   }
 
-  private buildPool() {
-    const seen = new Set<string>();
-    const defaultBundle = manifest.bundles.find((b) => b.name === "default");
-    const assets = defaultBundle?.assets ?? [];
-
-    for (const asset of assets) {
-      const srcs = Array.isArray(asset.src) ? asset.src : [asset.src];
-      const firstSrc = srcs[0];
-      const lower = firstSrc.toLowerCase();
-      const aliases = Array.isArray(asset.alias) ? asset.alias : [asset.alias];
-      const key = aliases[0] ?? firstSrc;
-
-      if (seen.has(key)) continue;
-
-      // exclude background videos — they belong to BackgroundLayer only
-      if (key.startsWith("main/backgrounds/")) continue;
-
-      if (IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
-        seen.add(key);
-        this.pool.push({ key, type: "image" });
-      } else if (VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
-        seen.add(key);
-        this.pool.push({ key, type: "video" });
-      } else if (lower.endsWith(GIF_EXTENSION)) {
-        seen.add(key);
-        this.pool.push({ key, type: "gif" });
-      }
-    }
+  private buildPool(projectName: string) {
+    this.pool = getProjectAssets(projectName);
   }
 
   public setBlockedCell(cellIdx: number) {
@@ -179,6 +147,7 @@ export class AssetSpawner {
   }
 
   private async spawn(bounds: { width: number; height: number }) {
+    if (this.pool.length === 0) return;
     if (this.assets.length >= compositionConfig.maxAssets) {
       const oldest = this.assets.shift();
       if (oldest) {
@@ -204,8 +173,32 @@ export class AssetSpawner {
       gridPos.y,
     );
     this.assetCellMap.set(asset, gridPos.cellIdx);
-    this.assets.push(asset);
     this.container.addChild(view);
+
+    if (this.overlapsAny(view)) {
+      this.container.removeChild(view);
+      view.destroy({ children: true });
+      this.assetCellMap.delete(asset);
+      return;
+    }
+
+    this.assets.push(asset);
+  }
+
+  private overlapsAny(view: Container): boolean {
+    const b = view.getBounds();
+    for (const existing of this.assets) {
+      const eb = existing.view.getBounds();
+      if (
+        b.x < eb.x + eb.width &&
+        b.x + b.width > eb.x &&
+        b.y < eb.y + eb.height &&
+        b.y + b.height > eb.y
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private async createView(): Promise<{

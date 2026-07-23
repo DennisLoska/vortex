@@ -2,14 +2,15 @@ import type { Ticker, Texture } from "pixi.js";
 import { ColorMatrixFilter, Color, Container } from "pixi.js";
 
 import { engine } from "../../getEngine";
+import { getProjectNames } from "../../assetManifest";
 import { AssetSpawner } from "./composition/AssetSpawner";
 import { BackgroundLayer } from "./composition/BackgroundLayer";
 import { TextOverlay } from "./composition/TextOverlay";
 import { WebcamAsset } from "./composition/WebcamAsset";
 
-export class CompositionScreen extends Container {
-  public static assetBundles = ["main"];
+let _activeProject: string | null = null;
 
+export class CompositionScreen extends Container {
   private background: BackgroundLayer;
   private assetLayer: Container;
   private spawner: AssetSpawner;
@@ -19,9 +20,16 @@ export class CompositionScreen extends Container {
   private paused = false;
   private globalTime = 0;
   private themeFilter = new ColorMatrixFilter();
+  private projects = getProjectNames();
+  private currentProject: string;
 
   constructor() {
     super();
+
+    if (!_activeProject || !this.projects.includes(_activeProject)) {
+      _activeProject = this.projects[0];
+    }
+    this.currentProject = _activeProject;
 
     this.background = new BackgroundLayer();
     this.addChild(this.background);
@@ -30,12 +38,14 @@ export class CompositionScreen extends Container {
     this.addChild(this.assetLayer);
 
     this.spawner = new AssetSpawner(this.assetLayer);
-
-    this.textOverlay = new TextOverlay();
-    this.addChild(this.textOverlay);
+    this.spawner.setProject(this.currentProject);
 
     this.webcam = new WebcamAsset();
     this.addChild(this.webcam);
+
+    this.textOverlay = new TextOverlay();
+    this.textOverlay.setProject(this.currentProject);
+    this.addChild(this.textOverlay);
 
     this.setupKeyboard();
 
@@ -43,12 +53,19 @@ export class CompositionScreen extends Container {
     this.webcam.filters = [this.themeFilter];
   }
 
+  private webcamInitialized = false;
+
   public async prepare() {
-    await this.background.setMultipleBackgrounds();
+    await this.background.setMultipleBackgrounds(this.currentProject);
     this.background.onNewBackground = (texture) => {
       this.extractAndApplyTheme(texture);
     };
     await this.textOverlay.loadPhrases();
+    await this.textOverlay.loadVoices();
+    if (!this.webcamInitialized) {
+      await this.webcam.init();
+      this.webcamInitialized = true;
+    }
   }
 
   private extractAndApplyTheme(texture: Texture) {
@@ -78,8 +95,11 @@ export class CompositionScreen extends Container {
   }
 
   public async show() {
+    this.bounds = { width: window.innerWidth, height: window.innerHeight };
+    this.background.resize(this.bounds.width, this.bounds.height);
+    this.textOverlay.resize(this.bounds.width, this.bounds.height);
+    this.webcam.resize(this.bounds);
     engine().audio.bgm.play("main/sounds/bgm-main.mp3", { volume: 0.5 });
-    await this.webcam.init();
     this.spawner.start(this.bounds);
   }
 
@@ -136,7 +156,17 @@ export class CompositionScreen extends Container {
     this.paused = false;
     this.spawner.stop();
     this.spawner.clear();
-    this.webcam.stop();
+  }
+
+  private async switchProject(name: string) {
+    _activeProject = name;
+    await this.hide();
+    this.currentProject = name;
+    this.spawner.setProject(name);
+    this.textOverlay.setProject(name);
+    this.background.removeChildren();
+    await this.prepare();
+    await this.show();
   }
 
   private setupKeyboard() {
@@ -155,12 +185,27 @@ export class CompositionScreen extends Container {
       if (event.code === "KeyN" && !event.shiftKey) {
         this.webcam.nextPreset();
       }
+      if (event.code === "KeyT") {
+        event.preventDefault();
+        this.webcam.toggleAnimation();
+      }
       if (event.shiftKey && event.code === "KeyH") {
         event.preventDefault();
         this.assetLayer.visible = !this.assetLayer.visible;
       } else if (event.code === "KeyH") {
         event.preventDefault();
         this.webcam.visible = !this.webcam.visible;
+      }
+
+      const num = parseInt(event.key);
+      if (
+        num >= 1 &&
+        num <= 9 &&
+        num <= this.projects.length &&
+        this.projects[num - 1] !== this.currentProject
+      ) {
+        event.preventDefault();
+        this.switchProject(this.projects[num - 1]);
       }
     });
   }
