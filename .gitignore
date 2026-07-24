@@ -41,3 +41,4 @@ projects/*
 
 # ChromaDB data
 chroma-data/
+package-lock.json
