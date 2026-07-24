@@ -18,6 +18,7 @@ import { FixedAssetLayer } from "../screens/main/composition/FixedAssetLayer";
 import { StatusOverlay } from "../screens/main/composition/StatusOverlay";
 import { WebcamAsset } from "../screens/main/composition/WebcamAsset";
 import { FILTER_PRESETS, getFilterPreset } from "./filterPresets";
+import { TextOverlay } from "../screens/main/composition/TextOverlay";
 import { loadStates, saveStates, type SceneState } from "./SceneState";
 
 type LayerId = "background" | "asset" | "fixed" | "status" | "webcam";
@@ -50,6 +51,7 @@ export class SceneBuilder {
   private fixedLayer: FixedAssetLayer;
   private webcam: WebcamAsset;
   private statusLayer: StatusOverlay;
+  private textOverlay: TextOverlay;
 
   constructor(
     bgLayer: BackgroundLayer,
@@ -57,6 +59,7 @@ export class SceneBuilder {
     fixedLayer: FixedAssetLayer,
     statusLayer: StatusOverlay,
     webcam: WebcamAsset,
+    textOverlay: TextOverlay,
     project: string,
   ) {
     this.bgLayer = bgLayer;
@@ -64,6 +67,7 @@ export class SceneBuilder {
     this.fixedLayer = fixedLayer;
     this.webcam = webcam;
     this.statusLayer = statusLayer;
+    this.textOverlay = textOverlay;
     this.currentProject = project;
 
     const root = document.createElement("div");
@@ -709,12 +713,22 @@ export class SceneBuilder {
       };
     }
 
+    const textPos = this.textOverlay.textPosition;
+    const textOverlay = textPos
+      ? {
+          x: textPos.x,
+          y: textPos.y,
+          currentIdx: this.textOverlay.currentIndex,
+        }
+      : null;
+
     return {
       name,
       timestamp: Date.now(),
       fixedAssets,
       draggedAssets,
       layers,
+      textOverlay,
     };
   }
 
@@ -743,6 +757,7 @@ export class SceneBuilder {
     // Clear layers
     this.fixedLayer.removeChildren();
     this.assetLayer.removeChildren();
+    this.textOverlay.clear();
 
     // Restore layer visibility and filters
     for (const [id, layerSt] of Object.entries(st.layers)) {
@@ -799,6 +814,15 @@ export class SceneBuilder {
       } catch {
         // skip
       }
+    }
+
+    // Restore text overlay
+    if (st.textOverlay) {
+      this.textOverlay.goTo(
+        st.textOverlay.currentIdx,
+        st.textOverlay.x,
+        st.textOverlay.y,
+      );
     }
 
     if (this.visible) this.renderLayer(this.activeLayer);

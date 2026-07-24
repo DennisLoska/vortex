@@ -18,12 +18,19 @@ export interface LayerStateEntry {
   filterIntensity: number;
 }
 
+export interface TextOverlayEntry {
+  x: number;
+  y: number;
+  currentIdx: number;
+}
+
 export interface SceneState {
   name: string;
   timestamp: number;
   fixedAssets: FixedAssetEntry[];
   draggedAssets: DraggedAssetEntry[];
   layers: Record<string, LayerStateEntry>;
+  textOverlay: TextOverlayEntry | null;
 }
 
 const STORAGE_KEY = "vortex-scene-states";

@@ -70,6 +70,7 @@ export class CompositionScreen extends Container {
       this.fixedLayer,
       this.statusOverlay,
       this.webcam,
+      this.textOverlay,
       this.currentProject,
     );
   }

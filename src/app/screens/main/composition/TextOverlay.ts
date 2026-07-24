@@ -40,6 +40,49 @@ export class TextOverlay extends Container {
     return { x: this.currentText.x, y: this.currentText.y };
   }
 
+  public get currentIndex(): number {
+    return this.currentIdx;
+  }
+
+  public set currentIndex(val: number) {
+    if (this.phrases.length === 0) return;
+    this.currentIdx = val % this.phrases.length;
+  }
+
+  public setTextPosition(x: number, y: number) {
+    if (this.currentText) {
+      this.currentText.x = x;
+      this.currentText.y = y;
+    }
+  }
+
+  public clear() {
+    if (this.currentText) {
+      this.removeChild(this.currentText);
+      this.currentText.destroy();
+      this.currentText = null;
+    }
+    this.fadingIn = false;
+    this.fadingOut = false;
+    this.fadeElapsed = 0;
+  }
+
+  public goTo(index: number, x?: number, y?: number) {
+    if (this.phrases.length === 0) return;
+    const idx = index % this.phrases.length;
+
+    this.clear();
+    this.currentIdx = idx;
+    this.showPhrase(idx);
+
+    if (x !== undefined && y !== undefined) {
+      this.currentText!.x = x;
+      this.currentText!.y = y;
+      this.currentText!.alpha = 1;
+      this.fadingIn = false;
+    }
+  }
+
   public async loadPhrases() {
     const entries = Object.entries(textModules)
       .filter(([path]) =>
