@@ -17,6 +17,10 @@ export async function handleAssetSearch(req: Request): Promise<Response> {
     );
   }
 
+  if (!/^[a-z0-9-]+$/.test(project)) {
+    return Response.json({ error: "Invalid project name" }, { status: 400 });
+  }
+
   try {
     const results = await Chroma.searchAssets(q, project, limit);
     return Response.json({ results });
@@ -34,6 +38,10 @@ export async function handleAssetList(req: Request): Promise<Response> {
 
   if (!project) {
     return Response.json({ error: "project param required" }, { status: 400 });
+  }
+
+  if (!/^[a-z0-9-]+$/.test(project)) {
+    return Response.json({ error: "Invalid project name" }, { status: 400 });
   }
 
   const assets: { alias: string; type: string }[] = [];

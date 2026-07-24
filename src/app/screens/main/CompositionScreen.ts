@@ -209,6 +209,11 @@ export class CompositionScreen extends Container {
 
   private setupKeyboard() {
     window.addEventListener("keydown", (event) => {
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement
+      )
+        return;
       if (event.code === "Space") {
         event.preventDefault();
         this.togglePause();

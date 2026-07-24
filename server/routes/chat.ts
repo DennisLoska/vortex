@@ -11,8 +11,25 @@ const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp", ".svg"]);
 const VIDEO_EXTS = new Set([".mp4", ".webm", ".m4v", ".ogv", ".mov"]);
 const GIF_EXT = ".gif";
 
+const actionSchema = z.object({
+  type: z.string(),
+  alias: z.string().optional(),
+  x: z.number().optional(),
+  y: z.number().optional(),
+  layer: z.string().optional(),
+  preset: z.string().optional(),
+  intensity: z.number().optional(),
+  visible: z.boolean().optional(),
+  index: z.number().optional(),
+  name: z.string().optional(),
+  nameOrIndex: z.union([z.string(), z.number()]).optional(),
+  query: z.string().optional(),
+  language: z.enum(["EN", "DE"]).optional(),
+  scale: z.number().optional(),
+});
+
 const responseSchema = z.object({
-  actions: z.array(z.record(z.string(), z.unknown())),
+  actions: z.array(actionSchema),
   explanation: z.string(),
 });
 
@@ -58,6 +75,10 @@ export async function handleChat(req: Request): Promise<Response> {
       { error: "message and project required" },
       { status: 400 },
     );
+  }
+
+  if (!/^[a-z0-9-]+$/.test(project)) {
+    return Response.json({ error: "Invalid project name" }, { status: 400 });
   }
 
   const stream = new ReadableStream({
@@ -169,8 +190,21 @@ export async function handleChat(req: Request): Promise<Response> {
           return;
         }
 
+        // Validate actions against project
+        const validActions = result.parsed.actions.filter((action) => {
+          if (!action.type || typeof action.type !== "string") return false;
+          if (action.alias && typeof action.alias === "string") {
+            if (!action.alias.startsWith(`${project}/`)) return false;
+          }
+          if (action.type === "placeAsset" || action.type === "removeAsset") {
+            if (action.layer !== "asset" && action.layer !== "fixed")
+              return false;
+          }
+          return true;
+        });
+
         const response: AgentResponse = {
-          actions: result.parsed.actions as AgentResponse["actions"],
+          actions: validActions as AgentResponse["actions"],
           explanation: result.parsed.explanation,
         };
 

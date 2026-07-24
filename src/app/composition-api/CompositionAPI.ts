@@ -207,12 +207,11 @@ export class CompositionAPI {
 
   async setBackground(alias: string): Promise<boolean> {
     if (!this.validateAlias(alias)) return false;
-    await this.bgLayer.setMultipleBackgrounds(this.currentProject);
-    return true;
+    return this.bgLayer.setBackground(alias);
   }
 
   nextBackground(): void {
-    // BackgroundLayer handles crossfade internally on its own timer
+    this.bgLayer.next();
   }
 
   // ─── Webcam ───
