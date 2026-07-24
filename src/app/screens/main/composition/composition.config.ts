@@ -72,7 +72,7 @@ export const webcamConfig = {
       phaseSpread: 2.5,
       subdivisions: 42,
       feather: 20,
-      clip: 0.4,
+      clip: 0.35,
     },
   },
 };
