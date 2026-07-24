@@ -1,7 +1,14 @@
 export type LayerId = "background" | "asset" | "fixed" | "status" | "webcam";
 
 export type AgentAction =
-  | { type: "placeAsset"; alias: string; x: number; y: number; layer: "asset" | "fixed"; scale?: number }
+  | {
+      type: "placeAsset";
+      alias: string;
+      x: number;
+      y: number;
+      layer: "asset" | "fixed";
+      scale?: number;
+    }
   | { type: "removeAsset"; alias: string; layer: "asset" | "fixed" }
   | { type: "setFilter"; layer: LayerId; preset: string; intensity?: number }
   | { type: "setLayerVisibility"; layer: LayerId; visible: boolean }

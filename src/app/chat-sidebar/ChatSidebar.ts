@@ -58,7 +58,8 @@ export class ChatSidebar {
   }
 
   private bindEvents(): void {
-    this.element.querySelector(".cs-close")!
+    this.element
+      .querySelector(".cs-close")!
       .addEventListener("click", () => this.hide());
 
     this.sendBtn.addEventListener("click", () => this.send());
@@ -118,7 +119,9 @@ export class ChatSidebar {
             try {
               const data = JSON.parse(line.slice(6));
               this.handleSSEEvent(event, data);
-            } catch { /* skip malformed */ }
+            } catch {
+              /* skip malformed */
+            }
             event = "";
           }
         }

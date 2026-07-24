@@ -11,7 +11,10 @@ export async function handleAssetSearch(req: Request): Promise<Response> {
   const limit = Number(url.searchParams.get("limit") || "10");
 
   if (!q || !project) {
-    return Response.json({ error: "q and project params required" }, { status: 400 });
+    return Response.json(
+      { error: "q and project params required" },
+      { status: 400 },
+    );
   }
 
   try {
@@ -49,7 +52,9 @@ export async function handleAssetList(req: Request): Promise<Response> {
         else if (!IMAGE_EXTS.has(ext)) continue;
         assets.push({ alias: `${project}/${subdir}/${file}`, type });
       }
-    } catch { /* dir missing */ }
+    } catch {
+      /* dir missing */
+    }
   }
 
   return Response.json({ assets });

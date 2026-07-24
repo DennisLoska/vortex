@@ -8,7 +8,10 @@ export async function handleProjects(req: Request): Promise<Response> {
     try {
       const entries = await readdir(PROJECTS_DIR, { withFileTypes: true });
       const projects = entries
-        .filter((e) => e.isDirectory() && !e.name.includes("{") && !e.name.startsWith("."))
+        .filter(
+          (e) =>
+            e.isDirectory() && !e.name.includes("{") && !e.name.startsWith("."),
+        )
         .map((e) => e.name);
       return Response.json({ projects });
     } catch {
@@ -21,11 +24,17 @@ export async function handleProjects(req: Request): Promise<Response> {
     const { name, language } = body;
 
     if (!name || !language) {
-      return Response.json({ error: "name and language required" }, { status: 400 });
+      return Response.json(
+        { error: "name and language required" },
+        { status: 400 },
+      );
     }
 
     if (!/^[a-z0-9-]+$/.test(name)) {
-      return Response.json({ error: "name must be lowercase alphanumeric with hyphens" }, { status: 400 });
+      return Response.json(
+        { error: "name must be lowercase alphanumeric with hyphens" },
+        { status: 400 },
+      );
     }
 
     const projectDir = join(PROJECTS_DIR, name);
@@ -40,9 +49,18 @@ export async function handleProjects(req: Request): Promise<Response> {
         JSON.stringify({ language }, null, 2) + "\n",
       );
 
-      await writeFile(join(projectDir, "texts", "01_welcome.txt"), `Welcome to ${name}.\n`);
-      await writeFile(join(projectDir, "texts", "02_reflection.txt"), "A space for creativity.\n");
-      await writeFile(join(projectDir, "texts", "03_invitation.txt"), "Explore and enjoy.\n");
+      await writeFile(
+        join(projectDir, "texts", "01_welcome.txt"),
+        `Welcome to ${name}.\n`,
+      );
+      await writeFile(
+        join(projectDir, "texts", "02_reflection.txt"),
+        "A space for creativity.\n",
+      );
+      await writeFile(
+        join(projectDir, "texts", "03_invitation.txt"),
+        "Explore and enjoy.\n",
+      );
 
       return Response.json({ success: true, path: `projects/${name}` });
     } catch (error) {

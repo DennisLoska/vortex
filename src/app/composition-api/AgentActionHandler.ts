@@ -11,7 +11,13 @@ export interface ActionResult {
   message: string;
 }
 
-const VALID_LAYERS: LayerId[] = ["background", "asset", "fixed", "status", "webcam"];
+const VALID_LAYERS: LayerId[] = [
+  "background",
+  "asset",
+  "fixed",
+  "status",
+  "webcam",
+];
 
 function isValidLayer(layer: unknown): layer is LayerId {
   return typeof layer === "string" && VALID_LAYERS.includes(layer as LayerId);
@@ -35,35 +41,63 @@ async function executeAction(
   api: CompositionAPI,
   action: AgentAction,
 ): Promise<ActionResult> {
-  const fail = (msg: string): ActionResult => ({ action, success: false, message: msg });
-  const ok = (msg: string): ActionResult => ({ action, success: true, message: msg });
+  const fail = (msg: string): ActionResult => ({
+    action,
+    success: false,
+    message: msg,
+  });
+  const ok = (msg: string): ActionResult => ({
+    action,
+    success: true,
+    message: msg,
+  });
 
   switch (action.type) {
     case "placeAsset": {
       const { alias, x, y, layer, scale } = action as unknown as {
-        alias: string; x: number; y: number; layer: "asset" | "fixed"; scale?: number;
+        alias: string;
+        x: number;
+        y: number;
+        layer: "asset" | "fixed";
+        scale?: number;
       };
-      if (layer !== "asset" && layer !== "fixed") return fail(`Invalid layer: ${layer}`);
+      if (layer !== "asset" && layer !== "fixed")
+        return fail(`Invalid layer: ${layer}`);
       const success = await api.placeAsset(alias, x, y, layer, scale);
       return success ? ok(`Placed ${alias}`) : fail(`Failed to place ${alias}`);
     }
 
     case "removeAsset": {
-      const { alias, layer } = action as unknown as { alias: string; layer: "asset" | "fixed" };
-      if (layer !== "asset" && layer !== "fixed") return fail(`Invalid layer: ${layer}`);
+      const { alias, layer } = action as unknown as {
+        alias: string;
+        layer: "asset" | "fixed";
+      };
+      if (layer !== "asset" && layer !== "fixed")
+        return fail(`Invalid layer: ${layer}`);
       const success = api.removeAsset(alias, layer);
-      return success ? ok(`Removed ${alias}`) : fail(`Asset not found: ${alias}`);
+      return success
+        ? ok(`Removed ${alias}`)
+        : fail(`Asset not found: ${alias}`);
     }
 
     case "setFilter": {
-      const { layer, preset, intensity } = action as unknown as { layer: string; preset: string; intensity?: number };
+      const { layer, preset, intensity } = action as unknown as {
+        layer: string;
+        preset: string;
+        intensity?: number;
+      };
       if (!isValidLayer(layer)) return fail(`Invalid layer: ${layer}`);
       const success = api.setFilter(layer, preset, intensity);
-      return success ? ok(`Filter ${preset} on ${layer}`) : fail(`Unknown filter: ${preset}`);
+      return success
+        ? ok(`Filter ${preset} on ${layer}`)
+        : fail(`Unknown filter: ${preset}`);
     }
 
     case "setLayerVisibility": {
-      const { layer, visible } = action as unknown as { layer: string; visible: boolean };
+      const { layer, visible } = action as unknown as {
+        layer: string;
+        visible: boolean;
+      };
       if (!isValidLayer(layer)) return fail(`Invalid layer: ${layer}`);
       api.setLayerVisibility(layer, visible);
       return ok(`${layer} ${visible ? "shown" : "hidden"}`);
@@ -72,7 +106,9 @@ async function executeAction(
     case "setBackground": {
       const { alias } = action as unknown as { alias: string };
       const success = await api.setBackground(alias);
-      return success ? ok(`Background set`) : fail(`Invalid background: ${alias}`);
+      return success
+        ? ok(`Background set`)
+        : fail(`Invalid background: ${alias}`);
     }
 
     case "nextBackground":
@@ -112,15 +148,23 @@ async function executeAction(
     }
 
     case "loadState": {
-      const { nameOrIndex } = action as unknown as { nameOrIndex: string | number };
+      const { nameOrIndex } = action as unknown as {
+        nameOrIndex: string | number;
+      };
       const success = await api.loadState(nameOrIndex);
-      return success ? ok(`State loaded`) : fail(`State not found: ${nameOrIndex}`);
+      return success
+        ? ok(`State loaded`)
+        : fail(`State not found: ${nameOrIndex}`);
     }
 
     case "deleteState": {
-      const { nameOrIndex } = action as unknown as { nameOrIndex: string | number };
+      const { nameOrIndex } = action as unknown as {
+        nameOrIndex: string | number;
+      };
       const success = api.deleteState(nameOrIndex);
-      return success ? ok(`State deleted`) : fail(`State not found: ${nameOrIndex}`);
+      return success
+        ? ok(`State deleted`)
+        : fail(`State not found: ${nameOrIndex}`);
     }
 
     case "getState":

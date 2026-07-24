@@ -29,7 +29,9 @@ async function getProjectAssets(project: string) {
       else if (!IMAGE_EXTS.has(ext)) continue;
       assets.push({ alias: `${project}/assets/${file}`, type });
     }
-  } catch { /* dir missing */ }
+  } catch {
+    /* dir missing */
+  }
   return assets;
 }
 
@@ -41,7 +43,9 @@ async function getProjectBackgrounds(project: string) {
     for (const file of files) {
       bgs.push(`${project}/backgrounds/${file}`);
     }
-  } catch { /* dir missing */ }
+  } catch {
+    /* dir missing */
+  }
   return bgs;
 }
 
@@ -50,14 +54,19 @@ export async function handleChat(req: Request): Promise<Response> {
   const { message, project, state } = body;
 
   if (!message || !project) {
-    return Response.json({ error: "message and project required" }, { status: 400 });
+    return Response.json(
+      { error: "message and project required" },
+      { status: 400 },
+    );
   }
 
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
       const send = (event: string, data: unknown) => {
-        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        controller.enqueue(
+          encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
+        );
       };
 
       try {
@@ -66,16 +75,52 @@ export async function handleChat(req: Request): Promise<Response> {
         const assets = await getProjectAssets(project);
         const backgrounds = await getProjectBackgrounds(project);
         const filterPresets = [
-          "None", "Grayscale", "Sepia", "Vintage", "Kodachrome", "Polaroid",
-          "Negative", "Technicolor", "Predator", "LSD", "Bright", "Contrast",
-          "Night", "Blur Light", "Blur Heavy", "Noise Light", "Noise Heavy",
-          "Alpha 50%", "Glow", "Bloom", "Drop Shadow", "Outline", "Pixelate",
-          "RGB Split", "CRT", "Emboss", "Motion Blur", "Glitch", "Godray",
-          "Bevel", "Cross Hatch", "Old Film", "ASCII", "Reflection",
-          "Tilt Shift", "Zoom Blur", "Adjustment",
+          "None",
+          "Grayscale",
+          "Sepia",
+          "Vintage",
+          "Kodachrome",
+          "Polaroid",
+          "Negative",
+          "Technicolor",
+          "Predator",
+          "LSD",
+          "Bright",
+          "Contrast",
+          "Night",
+          "Blur Light",
+          "Blur Heavy",
+          "Noise Light",
+          "Noise Heavy",
+          "Alpha 50%",
+          "Glow",
+          "Bloom",
+          "Drop Shadow",
+          "Outline",
+          "Pixelate",
+          "RGB Split",
+          "CRT",
+          "Emboss",
+          "Motion Blur",
+          "Glitch",
+          "Godray",
+          "Bevel",
+          "Cross Hatch",
+          "Old Film",
+          "ASCII",
+          "Reflection",
+          "Tilt Shift",
+          "Zoom Blur",
+          "Adjustment",
         ];
 
-        const systemPrompt = buildSystemPrompt(project, assets, backgrounds, filterPresets, state);
+        const systemPrompt = buildSystemPrompt(
+          project,
+          assets,
+          backgrounds,
+          filterPresets,
+          state,
+        );
 
         send("thinking", { status: "Calling LLM..." });
 
@@ -83,14 +128,27 @@ export async function handleChat(req: Request): Promise<Response> {
         const searchCheck = await LLM.structured(
           "You are a query analyzer. Determine if the user request requires searching for assets semantically. Return { needsSearch: boolean, searchQuery?: string }",
           message,
-          z.object({ needsSearch: z.boolean(), searchQuery: z.string().optional() }),
+          z.object({
+            needsSearch: z.boolean(),
+            searchQuery: z.string().optional(),
+          }),
         );
 
         let searchResults: string | null = null;
-        if (searchCheck?.parsed?.needsSearch && searchCheck.parsed.searchQuery) {
-          send("thinking", { status: `Searching assets: ${searchCheck.parsed.searchQuery}` });
-          const results = await Chroma.searchAssets(searchCheck.parsed.searchQuery, project);
-          searchResults = results.map((r) => `- ${r.id} (score: ${r.score.toFixed(3)})`).join("\n");
+        if (
+          searchCheck?.parsed?.needsSearch &&
+          searchCheck.parsed.searchQuery
+        ) {
+          send("thinking", {
+            status: `Searching assets: ${searchCheck.parsed.searchQuery}`,
+          });
+          const results = await Chroma.searchAssets(
+            searchCheck.parsed.searchQuery,
+            project,
+          );
+          searchResults = results
+            .map((r) => `- ${r.id} (score: ${r.score.toFixed(3)})`)
+            .join("\n");
         }
 
         const userMsg = searchResults
@@ -99,7 +157,11 @@ export async function handleChat(req: Request): Promise<Response> {
 
         send("thinking", { status: "Generating actions..." });
 
-        const result = await LLM.structured(systemPrompt, userMsg, responseSchema);
+        const result = await LLM.structured(
+          systemPrompt,
+          userMsg,
+          responseSchema,
+        );
 
         if (!result?.parsed) {
           send("error", { error: "LLM returned no valid response" });
@@ -115,7 +177,9 @@ export async function handleChat(req: Request): Promise<Response> {
         send("actions", response);
         send("done", {});
       } catch (error) {
-        send("error", { error: error instanceof Error ? error.message : String(error) });
+        send("error", {
+          error: error instanceof Error ? error.message : String(error),
+        });
       } finally {
         controller.close();
       }
@@ -126,7 +190,7 @@ export async function handleChat(req: Request): Promise<Response> {
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
+      Connection: "keep-alive",
       "Access-Control-Allow-Origin": "*",
     },
   });

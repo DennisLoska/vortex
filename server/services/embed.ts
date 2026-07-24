@@ -48,7 +48,10 @@ async function* walkAssets(): AsyncGenerator<AssetMeta> {
   }
 }
 
-export async function embedAllAssets(): Promise<{ embedded: number; skipped: number }> {
+export async function embedAllAssets(): Promise<{
+  embedded: number;
+  skipped: number;
+}> {
   let embedded = 0;
   let skipped = 0;
 
