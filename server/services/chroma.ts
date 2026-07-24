@@ -28,7 +28,7 @@ export namespace Chroma {
       await client.heartbeat();
     } catch (e) {
       console.error("ChromaDB healthcheck failed — is the server running?", e);
-      process.exit(1);
+      throw new Error("ChromaDB unavailable");
     }
     collection = await client.getOrCreateCollection({ name: COLLECTION_NAME });
     console.log(`ChromaDB ready: ${COLLECTION_NAME}`);

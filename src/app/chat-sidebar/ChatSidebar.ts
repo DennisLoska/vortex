@@ -141,7 +141,7 @@ export class ChatSidebar {
     }
   }
 
-  private handleSSEEvent(event: string, data: unknown): void {
+  private async handleSSEEvent(event: string, data: unknown): Promise<void> {
     switch (event) {
       case "thinking":
         this.updateLastSystemMessage((data as { status: string }).status);
@@ -156,8 +156,46 @@ export class ChatSidebar {
         this.removeLastSystemMessage();
         this.addMessage({ role: "agent", text: explanation });
 
-        if (actions.length > 0) {
-          executeActions(this.api, actions).then((results) => {
+        const projectActions = actions.filter(
+          (a) => a.type === "createProject",
+        );
+        const compositionActions = actions.filter(
+          (a) => a.type !== "createProject",
+        );
+
+        for (const action of projectActions) {
+          const { name, language } = action as unknown as {
+            name: string;
+            language: string;
+          };
+          try {
+            const res = await fetch("/api/projects", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name, language }),
+            });
+            const result = await res.json();
+            if (result.success) {
+              this.addMessage({
+                role: "system",
+                text: `✓ Project created: ${name}`,
+              });
+            } else {
+              this.addMessage({
+                role: "system",
+                text: `✗ Failed to create project: ${result.error}`,
+              });
+            }
+          } catch {
+            this.addMessage({
+              role: "system",
+              text: `✗ Project creation error`,
+            });
+          }
+        }
+
+        if (compositionActions.length > 0) {
+          executeActions(this.api, compositionActions).then((results) => {
             const failures = results.filter((r) => !r.success);
             if (failures.length > 0) {
               this.addMessage({

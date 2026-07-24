@@ -218,13 +218,11 @@ export class CompositionAPI {
   // ─── Webcam ───
 
   setWebcamPreset(index: number): void {
-    for (let i = 0; i <= index; i++) {
-      this.webcam.nextPreset();
-    }
+    this.webcam.setPreset(index);
   }
 
   toggleWebcam(): void {
-    this.webcam.visible = !this.webcam.visible;
+    this.setLayerVisibility("webcam", !this.controlState.webcam.visible);
   }
 
   // ─── Text ───

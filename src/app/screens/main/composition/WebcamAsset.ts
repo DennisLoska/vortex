@@ -118,6 +118,12 @@ export class WebcamAsset extends Container {
     this.applyPreset(next);
   }
 
+  public setPreset(index: number) {
+    this.userPlaced = false;
+    const clamped = Math.max(0, Math.min(index, webcamPresets.length - 1));
+    this.applyPreset(clamped);
+  }
+
   private applyPreset(index: number) {
     this.currentPresetIndex = index;
     const preset = webcamPresets[index];

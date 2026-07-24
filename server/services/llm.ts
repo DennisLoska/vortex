@@ -2,22 +2,41 @@
 import { LMStudioClient } from "@lmstudio/sdk";
 import z from "zod/v3";
 
-const LLM_MODEL = Bun.env.LLM_MODEL;
+const LLM_MODEL = Bun.env.LLM_MODEL!;
 if (!LLM_MODEL) throw new Error("LLM_MODEL env var missing");
 
-const EMBEDDING_MODEL = Bun.env.EMBEDDING_MODEL;
+const EMBEDDING_MODEL = Bun.env.EMBEDDING_MODEL!;
 if (!EMBEDDING_MODEL) throw new Error("EMBEDDING_MODEL env var missing");
 
-const client = new LMStudioClient();
-const llmModel = await client.llm.model(LLM_MODEL);
-const embeddingModel = await client.embedding.model(EMBEDDING_MODEL);
+const LLM_BASE_URL = Bun.env.LLM_BASE_URL || "http://localhost:1234";
+
+const client = new LMStudioClient({ baseUrl: LLM_BASE_URL });
+
+let llmModel: Awaited<ReturnType<typeof client.llm.model>> | null = null;
+let embeddingModel: Awaited<ReturnType<typeof client.embedding.model>> | null =
+  null;
+
+async function getLLMModel() {
+  if (!llmModel) {
+    llmModel = await client.llm.model(LLM_MODEL);
+  }
+  return llmModel;
+}
+
+async function getEmbeddingModel() {
+  if (!embeddingModel) {
+    embeddingModel = await client.embedding.model(EMBEDDING_MODEL);
+  }
+  return embeddingModel;
+}
 
 const MAX_TOKENS = 10_000;
 
 export namespace LLM {
   export async function chat(systemPrompt: string, userMessage: string) {
     try {
-      return await llmModel.respond(
+      const model = await getLLMModel();
+      return await model.respond(
         [
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessage },
@@ -36,7 +55,8 @@ export namespace LLM {
     schema: T,
   ) {
     try {
-      return (await llmModel.respond(
+      const model = await getLLMModel();
+      return (await model.respond(
         [
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessage },
@@ -50,7 +70,8 @@ export namespace LLM {
   }
 
   export async function generateEmbedding(text: string): Promise<number[]> {
-    const result = await embeddingModel.embed(text);
+    const model = await getEmbeddingModel();
+    const result = await model.embed(text);
     return result.embedding;
   }
 }
