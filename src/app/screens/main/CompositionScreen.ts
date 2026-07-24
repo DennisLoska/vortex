@@ -11,6 +11,7 @@ import { StatusOverlay } from "./composition/StatusOverlay";
 import { WebcamAsset } from "./composition/WebcamAsset";
 import { SceneBuilder } from "../../scene-builder/SceneBuilder";
 import { CompositionAPI } from "../../composition-api/CompositionAPI";
+import { ChatSidebar } from "../../chat-sidebar/ChatSidebar";
 
 let _activeProject: string | null = null;
 
@@ -28,7 +29,9 @@ export class CompositionScreen extends Container {
   private themeFilter = new ColorMatrixFilter();
   private projects = getProjectNames();
   private currentProject: string;
+  private compositionAPI: CompositionAPI;
   private sceneBuilder: SceneBuilder | null = null;
+  private chatSidebar: ChatSidebar;
 
   constructor() {
     super();
@@ -65,7 +68,7 @@ export class CompositionScreen extends Container {
     this.assetLayer.filters = [this.themeFilter];
     this.webcam.filters = [this.themeFilter];
 
-    const api = new CompositionAPI(
+    this.compositionAPI = new CompositionAPI(
       this.background,
       this.assetLayer,
       this.fixedLayer,
@@ -74,7 +77,11 @@ export class CompositionScreen extends Container {
       this.textOverlay,
       this.currentProject,
     );
-    this.sceneBuilder = new SceneBuilder(api, this.currentProject);
+    this.sceneBuilder = new SceneBuilder(
+      this.compositionAPI,
+      this.currentProject,
+    );
+    this.chatSidebar = new ChatSidebar(this.compositionAPI);
   }
 
   private webcamInitialized = false;
@@ -190,6 +197,7 @@ export class CompositionScreen extends Container {
     _activeProject = name;
     await this.hide();
     this.currentProject = name;
+    this.compositionAPI.setProject(name);
     this.spawner.setProject(name);
     this.textOverlay.setProject(name);
     this.sceneBuilder?.setProject(name);
@@ -230,6 +238,10 @@ export class CompositionScreen extends Container {
       if (event.code === "KeyM") {
         event.preventDefault();
         this.sceneBuilder?.toggle();
+      }
+      if (event.code === "KeyP") {
+        event.preventDefault();
+        this.chatSidebar?.toggle();
       }
 
       const num = parseInt(event.key);
