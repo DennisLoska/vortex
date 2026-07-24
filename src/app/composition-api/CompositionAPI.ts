@@ -12,7 +12,10 @@ import type { FixedAssetLayer } from "../screens/main/composition/FixedAssetLaye
 import type { StatusOverlay } from "../screens/main/composition/StatusOverlay";
 import type { WebcamAsset } from "../screens/main/composition/WebcamAsset";
 import type { TextOverlay } from "../screens/main/composition/TextOverlay";
-import { FILTER_PRESETS, getFilterPreset } from "../scene-builder/filterPresets";
+import {
+  FILTER_PRESETS,
+  getFilterPreset,
+} from "../scene-builder/filterPresets";
 import {
   loadStates,
   saveStates,
@@ -264,9 +267,8 @@ export class CompositionAPI {
 
     for (const fa of st.fixedAssets) {
       try {
-        const { FixedAsset: FA } = await import(
-          "../screens/main/composition/FixedAsset"
-        );
+        const { FixedAsset: FA } =
+          await import("../screens/main/composition/FixedAsset");
         const asset = await FA.load(fa.alias, {
           file: fa.alias.split("/").pop() || "",
           x: fa.x / 1920,
@@ -373,6 +375,47 @@ export class CompositionAPI {
       });
     }
     return loaded;
+  }
+
+  getLayerAssets(layerId: LayerId): AssetInfo[] {
+    switch (layerId) {
+      case "background":
+        return this.bgLayer.children
+          .filter((c): c is Sprite => c instanceof Sprite)
+          .map((s) => {
+            const k = s.label || s.texture.label || "background";
+            return {
+              alias: k,
+              type: k.toLowerCase().endsWith(".mp4") ? "video" : "image",
+            };
+          });
+      case "fixed":
+        return this.fixedLayer.children.map((c, i) => {
+          const alias =
+            (c as unknown as { alias?: string }).alias ||
+            c.label ||
+            `fixed-asset-${i}`;
+          return {
+            alias,
+            type: alias.toLowerCase().endsWith(".gif") ? "gif" : "image",
+            x: c.x,
+            y: c.y,
+          };
+        });
+      case "status":
+        return [{ alias: "hearts + xp + level", type: "image" }];
+      case "webcam":
+        return this.webcam.visible
+          ? [{ alias: "webcam-feed", type: "video" }]
+          : [];
+      case "asset":
+        return this.assetLayer.children.map((c) => ({
+          alias: c.label || "asset",
+          type: "image",
+          x: c.x,
+          y: c.y,
+        }));
+    }
   }
 
   getFilterPresets(): string[] {

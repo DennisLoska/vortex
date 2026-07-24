@@ -10,6 +10,7 @@ import { TextOverlay } from "./composition/TextOverlay";
 import { StatusOverlay } from "./composition/StatusOverlay";
 import { WebcamAsset } from "./composition/WebcamAsset";
 import { SceneBuilder } from "../../scene-builder/SceneBuilder";
+import { CompositionAPI } from "../../composition-api/CompositionAPI";
 
 let _activeProject: string | null = null;
 
@@ -64,7 +65,7 @@ export class CompositionScreen extends Container {
     this.assetLayer.filters = [this.themeFilter];
     this.webcam.filters = [this.themeFilter];
 
-    this.sceneBuilder = new SceneBuilder(
+    const api = new CompositionAPI(
       this.background,
       this.assetLayer,
       this.fixedLayer,
@@ -73,6 +74,7 @@ export class CompositionScreen extends Container {
       this.textOverlay,
       this.currentProject,
     );
+    this.sceneBuilder = new SceneBuilder(api, this.currentProject);
   }
 
   private webcamInitialized = false;
