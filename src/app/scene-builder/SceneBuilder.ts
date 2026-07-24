@@ -155,8 +155,7 @@ export class SceneBuilder {
         const val = parseInt((e.target as HTMLInputElement).value, 10);
         const label = this.contentEl.querySelector(".sb-filter-val");
         if (label) label.textContent = `${val}%`;
-        const current = this.api.getControlState(layerId).currentFilter;
-        this.api.setFilter(layerId, current, val);
+        this.api.adjustIntensity(layerId, val);
       });
 
     this.contentEl.querySelectorAll(".sb-draggable").forEach((el) => {

@@ -183,6 +183,18 @@ export class CompositionAPI {
     return this.setFilter(layer, "None");
   }
 
+  adjustIntensity(layer: LayerId, pct: number): void {
+    this.controlState[layer].filterIntensity = pct;
+    const inst = this.filterInstances.get(layer);
+    if (inst) {
+      this.adjustFilterIntensity(
+        inst,
+        this.controlState[layer].currentFilter,
+        pct,
+      );
+    }
+  }
+
   // ─── Visibility ───
 
   setLayerVisibility(layer: LayerId, visible: boolean): void {
