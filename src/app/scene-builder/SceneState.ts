@@ -1,11 +1,4 @@
-export interface FixedAssetEntry {
-  alias: string;
-  x: number;
-  y: number;
-  scale: number;
-}
-
-export interface DraggedAssetEntry {
+export interface AssetEntry {
   alias: string;
   x: number;
   y: number;
@@ -27,8 +20,8 @@ export interface TextOverlayEntry {
 export interface SceneState {
   name: string;
   timestamp: number;
-  fixedAssets: FixedAssetEntry[];
-  draggedAssets: DraggedAssetEntry[];
+  fixedAssets: AssetEntry[];
+  draggedAssets: AssetEntry[];
   layers: Record<string, LayerStateEntry>;
   textOverlay: TextOverlayEntry | null;
 }

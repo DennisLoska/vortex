@@ -19,7 +19,12 @@ import { StatusOverlay } from "../screens/main/composition/StatusOverlay";
 import { WebcamAsset } from "../screens/main/composition/WebcamAsset";
 import { FILTER_PRESETS, getFilterPreset } from "./filterPresets";
 import { TextOverlay } from "../screens/main/composition/TextOverlay";
-import { loadStates, saveStates, type SceneState } from "./SceneState";
+import {
+  loadStates,
+  saveStates,
+  type AssetEntry,
+  type SceneState,
+} from "./SceneState";
 
 type LayerId = "background" | "asset" | "fixed" | "status" | "webcam";
 
@@ -661,18 +666,8 @@ export class SceneBuilder {
   }
 
   private serializeCurrentState(name: string): SceneState {
-    const fixedAssets: {
-      alias: string;
-      x: number;
-      y: number;
-      scale: number;
-    }[] = [];
-    const draggedAssets: {
-      alias: string;
-      x: number;
-      y: number;
-      scale: number;
-    }[] = [];
+    const fixedAssets: AssetEntry[] = [];
+    const draggedAssets: AssetEntry[] = [];
 
     for (const child of this.fixedLayer.children) {
       if (child instanceof FixedAsset) {
