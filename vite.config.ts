@@ -7,6 +7,7 @@ export default defineConfig({
   plugins: [assetpackPlugin()],
   server: {
     port: 8080,
+    host: true,
     open: true,
     proxy: {
       "/api": {
