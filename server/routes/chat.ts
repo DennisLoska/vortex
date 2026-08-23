@@ -3,6 +3,11 @@ import { LLM } from "../services/llm";
 import { Chroma } from "../services/chroma";
 import { buildSystemPrompt } from "../system-prompt";
 import { FILTER_PRESET_NAMES } from "../filter-presets";
+import {
+  resolveAssetAlias,
+  resolveFilterPreset,
+  resolveLayer,
+} from "../utils/aliasResolver";
 import type { ChatRequest, AgentResponse } from "../types";
 import { readdir } from "node:fs/promises";
 import { join, extname } from "node:path";
@@ -176,8 +181,45 @@ export async function handleChat(req: Request): Promise<Response> {
           return;
         }
 
-        // Validate actions against project
-        const validActions = result.parsed.actions.filter((action) => {
+        // Normalize aliases / presets / layers + clamp numerics before validation
+        const assetAliases = assets.map((a) => a.alias);
+        const bgAliases = backgrounds;
+        const rewritten = result.parsed.actions.map((action) => {
+          const copy: any = { ...action };
+          // alias normalization (assets vs backgrounds)
+          if (copy.alias && typeof copy.alias === "string") {
+            const pool = copy.type === "setBackground" ? bgAliases : assetAliases;
+            if (pool.length > 0) {
+              const r = resolveAssetAlias(copy.alias.trim(), pool);
+              if (r.alias) copy.alias = r.alias;
+              else {
+                // try trimmed version for prefix check fallback (e.g., fix->fixed)
+                const alt = copy.alias.trim().replace(/\/fixed\//g, "/fix/");
+                const r2 = resolveAssetAlias(alt, pool);
+                if (r2.alias) copy.alias = r2.alias;
+              }
+            } else {
+              copy.alias = copy.alias.trim();
+            }
+          }
+          if (copy.layer && typeof copy.layer === "string") {
+            const lr = resolveLayer(copy.layer);
+            if (lr.layer) copy.layer = lr.layer;
+          }
+          if (copy.preset && typeof copy.preset === "string") {
+            const fr = resolveFilterPreset(copy.preset, filterPresets);
+            if (fr.preset) copy.preset = fr.preset;
+          }
+          if (copy.intensity !== undefined) copy.intensity = Math.max(0, Math.min(100, Number(copy.intensity)));
+          if (copy.index !== undefined) copy.index = Math.floor(Number(copy.index));
+          if (copy.x !== undefined) copy.x = Math.max(0, Math.min(1920, Number(copy.x)));
+          if (copy.y !== undefined) copy.y = Math.max(0, Math.min(1080, Number(copy.y)));
+          if (copy.scale !== undefined) copy.scale = Math.max(0.1, Math.min(2, Number(copy.scale)));
+          return copy;
+        });
+
+        // Validate actions against project (after normalization)
+        const validActions = rewritten.filter((action) => {
           if (!action.type || typeof action.type !== "string") return false;
           if (action.alias && typeof action.alias === "string") {
             if (!action.alias.startsWith(`${project}/`)) return false;
@@ -187,22 +229,16 @@ export async function handleChat(req: Request): Promise<Response> {
             action.type === "removeAsset" ||
             action.type === "moveAsset"
           ) {
-            if (action.layer !== "asset" && action.layer !== "fixed")
-              return false;
+            const lid = resolveLayer(action.layer as string).layer;
+            if (lid !== "asset" && lid !== "fixed") return false;
           }
           if (
             action.type === "setFilter" ||
             action.type === "clearFilter" ||
             action.type === "setLayerVisibility"
           ) {
-            const validLayers = [
-              "background",
-              "asset",
-              "fixed",
-              "status",
-              "webcam",
-            ];
-            if (!validLayers.includes(action.layer as string)) return false;
+            const lid = resolveLayer(action.layer as string).layer;
+            if (!lid) return false;
           }
           return true;
         });
