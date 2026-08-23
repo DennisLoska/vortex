@@ -2,6 +2,7 @@ import { z } from "zod/v3";
 import { LLM } from "../services/llm";
 import { Chroma } from "../services/chroma";
 import { buildSystemPrompt } from "../system-prompt";
+import { FILTER_PRESET_NAMES } from "../filter-presets";
 import type { ChatRequest, AgentResponse } from "../types";
 import { readdir } from "node:fs/promises";
 import { join, extname } from "node:path";
@@ -12,7 +13,27 @@ const VIDEO_EXTS = new Set([".mp4", ".webm", ".m4v", ".ogv", ".mov"]);
 const GIF_EXT = ".gif";
 
 const actionSchema = z.object({
-  type: z.string(),
+  type: z.enum([
+    "placeAsset",
+    "removeAsset",
+    "moveAsset",
+    "setFilter",
+    "clearFilter",
+    "setLayerVisibility",
+    "setBackground",
+    "nextBackground",
+    "setWebcamPreset",
+    "toggleWebcam",
+    "setTextIndex",
+    "nextText",
+    "setTextPosition",
+    "saveState",
+    "loadState",
+    "deleteState",
+    "getState",
+    "searchAssets",
+    "createProject",
+  ]),
   alias: z.string().optional(),
   x: z.number().optional(),
   y: z.number().optional(),
@@ -35,19 +56,22 @@ const responseSchema = z.object({
 
 async function getProjectAssets(project: string) {
   const assets: { alias: string; type: string }[] = [];
-  const dir = join(PROJECTS_DIR, project, "assets");
-  try {
-    const files = await readdir(dir);
-    for (const file of files) {
-      const ext = extname(file).toLowerCase();
-      let type = "image";
-      if (VIDEO_EXTS.has(ext)) type = "video";
-      else if (ext === GIF_EXT) type = "gif";
-      else if (!IMAGE_EXTS.has(ext)) continue;
-      assets.push({ alias: `${project}/assets/${file}`, type });
+  for (const subdir of ["assets", "fix"]) {
+    const dir = join(PROJECTS_DIR, project, subdir);
+    try {
+      const files = await readdir(dir);
+      for (const file of files) {
+        if (file === "layout.json") continue;
+        const ext = extname(file).toLowerCase();
+        let type = "image";
+        if (VIDEO_EXTS.has(ext)) type = "video";
+        else if (ext === GIF_EXT) type = "gif";
+        else if (!IMAGE_EXTS.has(ext)) continue;
+        assets.push({ alias: `${project}/${subdir}/${file}`, type });
+      }
+    } catch {
+      /* dir missing */
     }
-  } catch {
-    /* dir missing */
   }
   return assets;
 }
@@ -95,45 +119,7 @@ export async function handleChat(req: Request): Promise<Response> {
 
         const assets = await getProjectAssets(project);
         const backgrounds = await getProjectBackgrounds(project);
-        const filterPresets = [
-          "None",
-          "Grayscale",
-          "Sepia",
-          "Vintage",
-          "Kodachrome",
-          "Polaroid",
-          "Negative",
-          "Technicolor",
-          "Predator",
-          "LSD",
-          "Bright",
-          "Contrast",
-          "Night",
-          "Blur Light",
-          "Blur Heavy",
-          "Noise Light",
-          "Noise Heavy",
-          "Alpha 50%",
-          "Glow",
-          "Bloom",
-          "Drop Shadow",
-          "Outline",
-          "Pixelate",
-          "RGB Split",
-          "CRT",
-          "Emboss",
-          "Motion Blur",
-          "Glitch",
-          "Godray",
-          "Bevel",
-          "Cross Hatch",
-          "Old Film",
-          "ASCII",
-          "Reflection",
-          "Tilt Shift",
-          "Zoom Blur",
-          "Adjustment",
-        ];
+        const filterPresets = [...FILTER_PRESET_NAMES];
 
         const systemPrompt = buildSystemPrompt(
           project,
@@ -196,9 +182,27 @@ export async function handleChat(req: Request): Promise<Response> {
           if (action.alias && typeof action.alias === "string") {
             if (!action.alias.startsWith(`${project}/`)) return false;
           }
-          if (action.type === "placeAsset" || action.type === "removeAsset") {
+          if (
+            action.type === "placeAsset" ||
+            action.type === "removeAsset" ||
+            action.type === "moveAsset"
+          ) {
             if (action.layer !== "asset" && action.layer !== "fixed")
               return false;
+          }
+          if (
+            action.type === "setFilter" ||
+            action.type === "clearFilter" ||
+            action.type === "setLayerVisibility"
+          ) {
+            const validLayers = [
+              "background",
+              "asset",
+              "fixed",
+              "status",
+              "webcam",
+            ];
+            if (!validLayers.includes(action.layer as string)) return false;
           }
           return true;
         });

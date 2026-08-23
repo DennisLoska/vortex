@@ -48,7 +48,7 @@ export async function handleAssetList(req: Request): Promise<Response> {
   const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp", ".svg"]);
   const VIDEO_EXTS = new Set([".mp4", ".webm", ".m4v", ".ogv", ".mov"]);
 
-  for (const subdir of ["assets", "backgrounds"]) {
+  for (const subdir of ["assets", "fix", "backgrounds"]) {
     const dir = join(PROJECTS_DIR, project, subdir);
     try {
       const files = await readdir(dir);

@@ -10,7 +10,15 @@ export type AgentAction =
       scale?: number;
     }
   | { type: "removeAsset"; alias: string; layer: "asset" | "fixed" }
+  | {
+      type: "moveAsset";
+      alias: string;
+      x: number;
+      y: number;
+      layer: "asset" | "fixed";
+    }
   | { type: "setFilter"; layer: LayerId; preset: string; intensity?: number }
+  | { type: "clearFilter"; layer: LayerId }
   | { type: "setLayerVisibility"; layer: LayerId; visible: boolean }
   | { type: "setBackground"; alias: string }
   | { type: "nextBackground" }

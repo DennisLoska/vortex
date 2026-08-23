@@ -140,6 +140,20 @@ export class CompositionAPI {
     return true;
   }
 
+  moveAsset(
+    alias: string,
+    x: number,
+    y: number,
+    layer: "asset" | "fixed",
+  ): boolean {
+    if (!this.validateAlias(alias)) return false;
+    const container = layer === "fixed" ? this.fixedLayer : this.assetLayer;
+    const child = container.children.find((c) => c.label === alias);
+    if (!child) return false;
+    child.position.set(x, y);
+    return true;
+  }
+
   // ─── Filters ───
 
   setFilter(layer: LayerId, presetName: string, intensity?: number): boolean {

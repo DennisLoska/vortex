@@ -80,6 +80,21 @@ async function executeAction(
         : fail(`Asset not found: ${alias}`);
     }
 
+    case "moveAsset": {
+      const { alias, x, y, layer } = action as unknown as {
+        alias: string;
+        x: number;
+        y: number;
+        layer: "asset" | "fixed";
+      };
+      if (layer !== "asset" && layer !== "fixed")
+        return fail(`Invalid layer: ${layer}`);
+      const success = api.moveAsset(alias, x, y, layer);
+      return success
+        ? ok(`Moved ${alias} to (${x}, ${y})`)
+        : fail(`Asset not found: ${alias}`);
+    }
+
     case "setFilter": {
       const { layer, preset, intensity } = action as unknown as {
         layer: string;
@@ -91,6 +106,13 @@ async function executeAction(
       return success
         ? ok(`Filter ${preset} on ${layer}`)
         : fail(`Unknown filter: ${preset}`);
+    }
+
+    case "clearFilter": {
+      const { layer } = action as unknown as { layer: string };
+      if (!isValidLayer(layer)) return fail(`Invalid layer: ${layer}`);
+      const success = api.clearFilter(layer);
+      return success ? ok(`Cleared filter on ${layer}`) : fail(`Failed`);
     }
 
     case "setLayerVisibility": {

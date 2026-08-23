@@ -8,7 +8,7 @@ if (!LLM_MODEL) throw new Error("LLM_MODEL env var missing");
 const EMBEDDING_MODEL = Bun.env.EMBEDDING_MODEL!;
 if (!EMBEDDING_MODEL) throw new Error("EMBEDDING_MODEL env var missing");
 
-const LLM_BASE_URL = Bun.env.LLM_BASE_URL || "http://localhost:1234";
+void Bun.env.LLM_BASE_URL;
 
 // const client = new LMStudioClient({ baseUrl: LLM_BASE_URL });
 const client = new LMStudioClient();
