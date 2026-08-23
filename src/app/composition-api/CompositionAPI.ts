@@ -116,7 +116,9 @@ export class CompositionAPI {
     container: Container,
   ): string | null {
     const avail = this.getAvailableAliases();
-    const labels = container.children.map((c) => c.label || "").filter(Boolean) as string[];
+    const labels = container.children
+      .map((c) => c.label || "")
+      .filter(Boolean) as string[];
     // prefer labels present in container, then manifest
     const combined = [...new Set([...labels, ...avail])];
     const r = resolveAssetAlias(requested, combined);
@@ -225,10 +227,17 @@ export class CompositionAPI {
     const container = layer === "fixed" ? this.fixedLayer : this.assetLayer;
     const cx = clampCoord(x, 1920);
     const cy = clampCoord(y, 1080);
-    let child = container.children.find((c) => c.label === canonical) || container.children.find((c) => c.label === trimmed);
+    let child =
+      container.children.find((c) => c.label === canonical) ||
+      container.children.find((c) => c.label === trimmed);
     if (!child) {
-      const resolved = this.resolveAliasForContainer(trimmed, container) || this.resolveAliasForContainer(canonical, container);
-      if (resolved) child = container.children.find((c) => c.label === resolved) as typeof child;
+      const resolved =
+        this.resolveAliasForContainer(trimmed, container) ||
+        this.resolveAliasForContainer(canonical, container);
+      if (resolved)
+        child = container.children.find(
+          (c) => c.label === resolved,
+        ) as typeof child;
     }
     if (!child) return false;
     child.position.set(cx, cy);
@@ -246,11 +255,15 @@ export class CompositionAPI {
     // resolve preset case-insensitive / hyphen etc.
     let canonicalPreset = presetName?.trim() ?? "";
     if (canonicalPreset && canonicalPreset !== "None") {
-      const r = resolveFilterPreset(canonicalPreset, FILTER_PRESETS.map((p) => p.name));
+      const r = resolveFilterPreset(
+        canonicalPreset,
+        FILTER_PRESETS.map((p) => p.name),
+      );
       if (r.preset) canonicalPreset = r.preset;
     }
 
-    const intensityClamped = intensity !== undefined ? clampIntensity(intensity) : undefined;
+    const intensityClamped =
+      intensity !== undefined ? clampIntensity(intensity) : undefined;
 
     this.controlState[lid].currentFilter = canonicalPreset;
     if (intensityClamped !== undefined) {
@@ -279,7 +292,11 @@ export class CompositionAPI {
     this.filterInstances.set(lid, filter);
     if (filter) {
       try {
-        this.adjustFilterIntensity(filter, canonicalPreset, this.controlState[lid].filterIntensity);
+        this.adjustFilterIntensity(
+          filter,
+          canonicalPreset,
+          this.controlState[lid].filterIntensity,
+        );
       } catch {
         /* ignore intensity adjust failures in headless */
       }
@@ -378,8 +395,11 @@ export class CompositionAPI {
   // ─── State ───
 
   saveState(name: string): SceneState {
-    const state = this.serializeState(name);
+    const trimmed = name.trim() || "unnamed";
+    const state = this.serializeState(trimmed);
     const states = loadStates(this.currentProject);
+    const existingIdx = states.findIndex((s) => s.name === trimmed);
+    if (existingIdx !== -1) states.splice(existingIdx, 1);
     states.push(state);
     saveStates(this.currentProject, states);
     return state;
@@ -499,7 +519,19 @@ export class CompositionAPI {
   }
 
   getAvailableAssets(): AssetInfo[] {
-    return [];
+    try {
+      const fix = getProjectFixAssets(this.currentProject).map((alias) => ({
+        alias,
+        type: alias.toLowerCase().endsWith(".gif") ? "gif" : "image",
+      }));
+      const pool = getProjectAssets(this.currentProject).map((p) => ({
+        alias: p.key,
+        type: p.type,
+      }));
+      return [...fix, ...pool];
+    } catch {
+      return [];
+    }
   }
 
   getLoadedAssets(): AssetInfo[] {

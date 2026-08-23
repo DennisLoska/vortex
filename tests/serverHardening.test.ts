@@ -1,6 +1,10 @@
 import { describe, it, expect } from "bun:test";
 import { buildSystemPrompt } from "../server/system-prompt";
-import { resolveAssetAlias, resolveFilterPreset, resolveLayer } from "../server/utils/aliasResolver";
+import {
+  resolveAssetAlias,
+  resolveFilterPreset,
+  resolveLayer,
+} from "../server/utils/aliasResolver";
 
 describe("server correction + prompt hardening", () => {
   it("resolveAssetAlias corrects wrong extension", () => {
@@ -19,8 +23,16 @@ describe("server correction + prompt hardening", () => {
   });
 
   it("system prompt contains hardened verbatim rule", () => {
-    const prompt = buildSystemPrompt("faery", [{ alias: "faery/fix/hearts.png", type: "image" }], ["faery/backgrounds/bg.mp4"], ["Grayscale", "Sepia"], "{}");
-    expect(prompt).toContain("Copy alias verbatim including extension and case");
+    const prompt = buildSystemPrompt(
+      "faery",
+      [{ alias: "faery/fix/hearts.png", type: "image" }],
+      ["faery/backgrounds/bg.mp4"],
+      ["Grayscale", "Sepia"],
+      "{}",
+    );
+    expect(prompt).toContain(
+      "Copy alias verbatim including extension and case",
+    );
     expect(prompt).toContain('layer param MUST be "fixed"');
     expect(prompt).toContain("grey");
   });

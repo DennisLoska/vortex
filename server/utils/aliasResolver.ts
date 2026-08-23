@@ -1,5 +1,11 @@
 export type LayerId = "background" | "asset" | "fixed" | "status" | "webcam";
-const VALID_LAYERS: LayerId[] = ["background", "asset", "fixed", "status", "webcam"];
+const VALID_LAYERS: LayerId[] = [
+  "background",
+  "asset",
+  "fixed",
+  "status",
+  "webcam",
+];
 
 export function normalizeAlias(s: string): string {
   return s.trim();
@@ -18,7 +24,11 @@ function levenshtein(a: string, b: string): number {
     m[0] = j;
     for (let i = 1; i <= a.length; i++) {
       const tmp = m[i];
-      m[i] = Math.min(m[i] + 1, m[i - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      m[i] = Math.min(
+        m[i] + 1,
+        m[i - 1] + 1,
+        prev + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
       prev = tmp;
     }
   }
@@ -42,14 +52,20 @@ export function resolveAssetAlias(
   // also try reverse: available has /fixed/ but requested has /fix/ ?
   // generally alias uses /fix/, so already handled; but handle both ways
   const revPath = n.replace(/\/fix\//g, "/fixed/");
-  const revCi = available.find((a) => a.toLowerCase() === revPath.toLowerCase());
+  const revCi = available.find(
+    (a) => a.toLowerCase() === revPath.toLowerCase(),
+  );
   if (revCi) return { alias: revCi, suggestion: [] };
 
   const base = basenameNoExt(n).toLowerCase();
   // unique basename without ext
-  const withoutExtMatches = available.filter((a) => basenameNoExt(a).toLowerCase() === base);
-  if (withoutExtMatches.length === 1) return { alias: withoutExtMatches[0], suggestion: [] };
-  if (withoutExtMatches.length > 1) return { alias: null, suggestion: withoutExtMatches.slice(0, 5) };
+  const withoutExtMatches = available.filter(
+    (a) => basenameNoExt(a).toLowerCase() === base,
+  );
+  if (withoutExtMatches.length === 1)
+    return { alias: withoutExtMatches[0], suggestion: [] };
+  if (withoutExtMatches.length > 1)
+    return { alias: null, suggestion: withoutExtMatches.slice(0, 5) };
 
   // includes fallback (for basename only like "hearts" matching path)
   if (base.length >= 2) {
@@ -60,7 +76,8 @@ export function resolveAssetAlias(
       if (withoutExtMatches.length === 0) {
         // if single include and basename matches partially, treat as resolved if unambiguous basename
         // but for safety, if single include, resolve
-        if (includes.length === 1) return { alias: includes[0], suggestion: [] };
+        if (includes.length === 1)
+          return { alias: includes[0], suggestion: [] };
         return { alias: null, suggestion: includes.slice(0, 5) };
       }
     }
@@ -77,7 +94,11 @@ export function resolveFilterPreset(
   const n = requested.trim();
   const ci = presets.find((p) => p.toLowerCase() === n.toLowerCase());
   if (ci) return { preset: ci, suggestion: [] };
-  const norm = (s: string) => s.toLowerCase().replace(/[-_\s]+/g, "").replace("grey", "gray");
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[-_\s]+/g, "")
+      .replace("grey", "gray");
   const nn = norm(n);
   const found = presets.find((p) => norm(p) === nn);
   if (found) return { preset: found, suggestion: [] };
@@ -90,11 +111,18 @@ export function resolveFilterPreset(
     .map((p) => ({ p, d: levenshtein(nn, norm(p)) }))
     .sort((a, b) => a.d - b.d);
   const best = scored[0];
-  if (best && best.d <= 2) return { preset: null, suggestion: [best.p, ...scored.slice(1, 2).map((s) => s.p)] };
+  if (best && best.d <= 2)
+    return {
+      preset: null,
+      suggestion: [best.p, ...scored.slice(1, 2).map((s) => s.p)],
+    };
   return { preset: null, suggestion: presets.slice(0, 5) };
 }
 
-export function resolveLayer(requested: string): { layer: LayerId | null; suggestion: LayerId[] } {
+export function resolveLayer(requested: string): {
+  layer: LayerId | null;
+  suggestion: LayerId[];
+} {
   const n = requested.trim().toLowerCase();
   if (n === "fix") return { layer: "fixed", suggestion: [] };
   if (n === "backgrounds") return { layer: "background", suggestion: [] };

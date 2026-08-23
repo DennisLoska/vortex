@@ -185,10 +185,12 @@ export async function handleChat(req: Request): Promise<Response> {
         const assetAliases = assets.map((a) => a.alias);
         const bgAliases = backgrounds;
         const rewritten = result.parsed.actions.map((action) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const copy: any = { ...action };
           // alias normalization (assets vs backgrounds)
           if (copy.alias && typeof copy.alias === "string") {
-            const pool = copy.type === "setBackground" ? bgAliases : assetAliases;
+            const pool =
+              copy.type === "setBackground" ? bgAliases : assetAliases;
             if (pool.length > 0) {
               const r = resolveAssetAlias(copy.alias.trim(), pool);
               if (r.alias) copy.alias = r.alias;
@@ -210,11 +212,16 @@ export async function handleChat(req: Request): Promise<Response> {
             const fr = resolveFilterPreset(copy.preset, filterPresets);
             if (fr.preset) copy.preset = fr.preset;
           }
-          if (copy.intensity !== undefined) copy.intensity = Math.max(0, Math.min(100, Number(copy.intensity)));
-          if (copy.index !== undefined) copy.index = Math.floor(Number(copy.index));
-          if (copy.x !== undefined) copy.x = Math.max(0, Math.min(1920, Number(copy.x)));
-          if (copy.y !== undefined) copy.y = Math.max(0, Math.min(1080, Number(copy.y)));
-          if (copy.scale !== undefined) copy.scale = Math.max(0.1, Math.min(2, Number(copy.scale)));
+          if (copy.intensity !== undefined)
+            copy.intensity = Math.max(0, Math.min(100, Number(copy.intensity)));
+          if (copy.index !== undefined)
+            copy.index = Math.floor(Number(copy.index));
+          if (copy.x !== undefined)
+            copy.x = Math.max(0, Math.min(1920, Number(copy.x)));
+          if (copy.y !== undefined)
+            copy.y = Math.max(0, Math.min(1080, Number(copy.y)));
+          if (copy.scale !== undefined)
+            copy.scale = Math.max(0.1, Math.min(2, Number(copy.scale)));
           return copy;
         });
 

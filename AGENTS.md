@@ -17,7 +17,7 @@ Boundaries: code/commits/PRs written normal.
 <!-- caveman-end -->
 
 ## Project Overview
-Vortex — PixiJS v8 real-time video composition engine. Layers: background (video/image), asset (floating pool via AssetSpawner), fixed (persistent decor via FixedAssetLayer), status (StatusOverlay hearts/xp), webcam (WebcamAsset with presets), text (TextOverlay phrases). All mutations via unified CompositionAPI (src/app/composition-api/CompositionAPI.ts). Agent actions executed via AgentActionHandler, UI via SceneBuilder (M key) and ChatSidebar (P key, SSE to Bun server). Server uses LM Studio LLM + ChromaDB semantic asset search.
+Vortex — PixiJS v8 real-time video composition engine. Layers: background (video/image), asset (floating pool via AssetSpawner), fixed (persistent decor via FixedAssetLayer), status (StatusOverlay hearts/xp), webcam (WebcamAsset with presets), text (TextOverlay phrases). All mutations via unified CompositionAPI (src/app/composition-api/CompositionAPI.ts). Agent actions executed via AgentActionHandler, UI via SceneBuilder (M key) and ChatSidebar (P key, SSE to Bun server). Server uses opencode LLM (opencode-go/ox-alpha-free via :4096, config-driven `opencode.json`) + LM Studio embeddings (`text-embedding-qwen3-embedding-8b` via :1234) + ChromaDB semantic asset search.
 
 ## Project Structure
 ```
@@ -30,12 +30,12 @@ server/                   index.ts, routes/chat.ts|assets.ts|projects.ts, servic
 projects/<name>/          assets/, backgrounds/, fix/, texts/, voices/, project.json
 docs/superpowers/         specs/, plans/  # oneshot pipeline artifacts
 public/                   built assets via AssetPack
-opencode.json             project opencode config (default model lmstudio/qwen3.6-35b)
+opencode.json             project opencode config (default model opencode-go/ox-alpha-free)
 ```
 
 ## Default Tool: opencode
 - opencode is primary agent. Config: `opencode.json` at project root (checked in) + `~/.config/opencode/opencode.json` (global).
-- Model default: `lmstudio/qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex` via LM Studio at http://127.0.0.1:1234/v1
+- Model default: `opencode-go/ox-alpha-free` (free alpha, via opencode router)
 - Skills paths use linux home `/home/dennis/.cache/...` (not /Users/...)
 - Run via `opencode` / `bunx opencode` . Verify with `opencode --help`.
 
@@ -56,7 +56,7 @@ Red flags — never say: "This should work now", "Try it now" (without trying), 
 ```bash
 bun install
 bun run dev        # Vite :8080, proxies /api → :3001
-bun run server     # Bun server :3001 (needs LM Studio + ChromaDB)
+bun run server     # Bun server :3001 (needs opencode :4096 + LM Studio :1234 for embeddings + ChromaDB)
 bun run embed-assets  # one-shot ChromaDB indexing
 bun tsc --noEmit; bun run lint; vite build
 ```

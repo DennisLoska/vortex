@@ -32,13 +32,18 @@ function getValidLayer(layer: unknown): LayerId | null {
   return r.layer;
 }
 
-function assetSuggestion(alias: string, api: CompositionAPI, layer?: string): string {
+function assetSuggestion(
+  alias: string,
+  api: CompositionAPI,
+  layer?: string,
+): string {
   try {
     const layerId = layer ? getValidLayer(layer) || (layer as LayerId) : null;
     const avail = layerId
       ? api.getLayerAssets(layerId).map((a) => a.alias)
       : api.getLoadedAssets().map((a) => a.alias);
-    const pool = avail.length > 0 ? avail : api.getLoadedAssets().map((a) => a.alias);
+    const pool =
+      avail.length > 0 ? avail : api.getLoadedAssets().map((a) => a.alias);
     if (pool.length === 0) return "";
     const r = resolveAssetAlias(alias, pool);
     if (r.suggestion.length) return ` Did you mean ${r.suggestion[0]}?`;
@@ -50,9 +55,20 @@ function assetSuggestion(alias: string, api: CompositionAPI, layer?: string): st
 }
 
 function filterSuggestion(preset: string): string {
-  const r = resolveFilterPreset(preset, FILTER_PRESETS.map((p) => p.name));
-  if (r.suggestion.length) return ` Did you mean ${r.suggestion[0]}? Available: ${FILTER_PRESETS.slice(0, 5).map((p) => p.name).join(", ")}...`;
-  return ` Available: ${FILTER_PRESETS.slice(0, 5).map((p) => p.name).join(", ")}...`;
+  const r = resolveFilterPreset(
+    preset,
+    FILTER_PRESETS.map((p) => p.name),
+  );
+  if (r.suggestion.length)
+    return ` Did you mean ${r.suggestion[0]}? Available: ${FILTER_PRESETS.slice(
+      0,
+      5,
+    )
+      .map((p) => p.name)
+      .join(", ")}...`;
+  return ` Available: ${FILTER_PRESETS.slice(0, 5)
+    .map((p) => p.name)
+    .join(", ")}...`;
 }
 
 export async function executeActions(
@@ -98,7 +114,13 @@ async function executeAction(
         return fail(`Invalid layer: ${layer}. Valid: asset, fixed`);
       const nx = clampCoord(Number(x) || 0, 1920);
       const ny = clampCoord(Number(y) || 0, 1080);
-      const success = await api.placeAsset(alias, nx, ny, lid as "asset" | "fixed", scale);
+      const success = await api.placeAsset(
+        alias,
+        nx,
+        ny,
+        lid as "asset" | "fixed",
+        scale,
+      );
       return success
         ? ok(`Placed ${alias} on ${lid}`)
         : fail(`Failed to place ${alias}${assetSuggestion(alias, api, lid)}`);
@@ -143,10 +165,16 @@ async function executeAction(
         intensity?: number;
       };
       const lid = getValidLayer(layer);
-      if (!lid) return fail(`Invalid layer: ${layer}. Valid: ${VALID_LAYERS.join(", ")}`);
+      if (!lid)
+        return fail(
+          `Invalid layer: ${layer}. Valid: ${VALID_LAYERS.join(", ")}`,
+        );
       const success = api.setFilter(lid, preset, intensity);
       if (success) {
-        const norm = resolveFilterPreset(preset, FILTER_PRESETS.map((p) => p.name));
+        const norm = resolveFilterPreset(
+          preset,
+          FILTER_PRESETS.map((p) => p.name),
+        );
         const canonical = norm.preset || preset;
         return ok(`Filter ${canonical} on ${lid}`);
       }
@@ -156,9 +184,14 @@ async function executeAction(
     case "clearFilter": {
       const { layer } = action as unknown as { layer: string };
       const lid = getValidLayer(layer);
-      if (!lid) return fail(`Invalid layer: ${layer}. Valid: ${VALID_LAYERS.join(", ")}`);
+      if (!lid)
+        return fail(
+          `Invalid layer: ${layer}. Valid: ${VALID_LAYERS.join(", ")}`,
+        );
       const success = api.clearFilter(lid);
-      return success ? ok(`Cleared filter on ${lid}`) : fail(`Failed to clear filter on ${lid}`);
+      return success
+        ? ok(`Cleared filter on ${lid}`)
+        : fail(`Failed to clear filter on ${lid}`);
     }
 
     case "setLayerVisibility": {
@@ -167,7 +200,10 @@ async function executeAction(
         visible: boolean;
       };
       const lid = getValidLayer(layer);
-      if (!lid) return fail(`Invalid layer: ${layer}. Valid: ${VALID_LAYERS.join(", ")}`);
+      if (!lid)
+        return fail(
+          `Invalid layer: ${layer}. Valid: ${VALID_LAYERS.join(", ")}`,
+        );
       api.setLayerVisibility(lid, visible);
       return ok(`${lid} ${visible ? "shown" : "hidden"}`);
     }
@@ -177,7 +213,9 @@ async function executeAction(
       const success = await api.setBackground(alias);
       return success
         ? ok(`Background set to ${alias}`)
-        : fail(`Invalid background: ${alias}${assetSuggestion(alias, api, "background")}`);
+        : fail(
+            `Invalid background: ${alias}${assetSuggestion(alias, api, "background")}`,
+          );
     }
 
     case "nextBackground":
@@ -212,7 +250,8 @@ async function executeAction(
       const nx = clampCoord(Number(x) || 0, 1920);
       const ny = clampCoord(Number(y) || 0, 1080);
       api.setTextPosition(nx, ny);
-      const note = nx !== Number(x) || ny !== Number(y) ? ` (clamped to ${nx},${ny})` : "";
+      const note =
+        nx !== Number(x) || ny !== Number(y) ? ` (clamped to ${nx},${ny})` : "";
       return ok(`Text moved to (${nx}, ${ny})${note}`);
     }
 
