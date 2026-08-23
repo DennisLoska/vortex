@@ -10,7 +10,8 @@ if (!EMBEDDING_MODEL) throw new Error("EMBEDDING_MODEL env var missing");
 
 const LLM_BASE_URL = Bun.env.LLM_BASE_URL || "http://localhost:1234";
 
-const client = new LMStudioClient({ baseUrl: LLM_BASE_URL });
+// const client = new LMStudioClient({ baseUrl: LLM_BASE_URL });
+const client = new LMStudioClient();
 
 let llmModel: Awaited<ReturnType<typeof client.llm.model>> | null = null;
 let embeddingModel: Awaited<ReturnType<typeof client.embedding.model>> | null =

@@ -27,6 +27,7 @@ Bun.serve({
 
     return new Response("Not Found", { status: 404 });
   },
+  idleTimeout: 30,
 });
 
 console.log(`Vortex server running on http://localhost:${PORT}`);
