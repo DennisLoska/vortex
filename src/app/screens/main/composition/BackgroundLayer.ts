@@ -228,6 +228,74 @@ export class BackgroundLayer extends Container {
     return this.videos.find((v) => source.resource === v);
   }
 
+  /** Crossfade to a specific background by alias. */
+  public async setBackground(alias: string): Promise<boolean> {
+    try {
+      const texture = await Assets.load<Texture>(alias);
+
+      const source = texture.source;
+      if (source instanceof VideoSource) {
+        const videoEl = source.resource as HTMLVideoElement;
+        if (videoEl) {
+          videoEl.loop = true;
+          videoEl.muted = true;
+          videoEl.playsInline = true;
+          if (!this.videos.includes(videoEl)) this.videos.push(videoEl);
+          void videoEl.play();
+        }
+      }
+
+      if (!this.textures.includes(texture)) {
+        this.textures.push(texture);
+      }
+      this.currentIdx = this.textures.indexOf(texture);
+
+      const newSprite = new Sprite({
+        texture,
+        anchor: 0.5,
+        alpha: 0,
+      });
+      newSprite.label = alias;
+      this.stretchToFill(newSprite);
+      this.addChild(newSprite);
+
+      if (this.activeSprite === null) {
+        this.activeSprite = newSprite;
+        this.needsFadeIn = true;
+        this.fadeInAlpha = 0;
+        this.autoTimer = 0;
+        this.nextAutoDelay = 999;
+        return true;
+      }
+
+      // Finish any in-flight transition instantly so the new sprite
+      // becomes the single crossfade target
+      if (this.transitioning && this.tempSprite) {
+        const stale = this.tempSprite;
+        this.zoomData.delete(stale);
+        this.removeChild(stale);
+        stale.destroy({ children: false, texture: false });
+        this.tempSprite = null;
+        this.transitioning = false;
+        this.transitionElapsed = 0;
+      }
+
+      this.tempSprite = newSprite;
+      this.transitioning = true;
+      this.transitionDuration = 10;
+      this.transitionElapsed = 0;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Trigger the same random crossfade the auto-timer runs. */
+  public next(): void {
+    if (this.textures.length < 2 || this.activeSprite === null) return;
+    this.transitionToRandom();
+  }
+
   private transitionToRandom() {
     if (this.transitioning) return;
 

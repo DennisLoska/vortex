@@ -38,3 +38,7 @@ projects/*
 
 .oneshot-state
 .opencode/
+
+# ChromaDB data
+chroma-data/
+package-lock.json

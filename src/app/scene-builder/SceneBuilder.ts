@@ -1,32 +1,15 @@
-import { Container, Sprite, Texture, Assets, type Filter } from "pixi.js";
-import {
-  AlphaFilter,
-  BlurFilter,
-  ColorMatrixFilter,
-  NoiseFilter,
-} from "pixi.js";
-import { GifSprite } from "pixi.js/gif";
 import { engine } from "../getEngine";
 import {
   getProjectAssets,
   getProjectBackgrounds,
   getProjectFixAssets,
 } from "../assetManifest";
-import { BackgroundLayer } from "../screens/main/composition/BackgroundLayer";
-import { FixedAsset } from "../screens/main/composition/FixedAsset";
-import { FixedAssetLayer } from "../screens/main/composition/FixedAssetLayer";
-import { StatusOverlay } from "../screens/main/composition/StatusOverlay";
-import { WebcamAsset } from "../screens/main/composition/WebcamAsset";
-import { FILTER_PRESETS, getFilterPreset } from "./filterPresets";
-import { TextOverlay } from "../screens/main/composition/TextOverlay";
-import {
-  loadStates,
-  saveStates,
-  type AssetEntry,
-  type SceneState,
-} from "./SceneState";
-
-type LayerId = "background" | "asset" | "fixed" | "status" | "webcam";
+import { FILTER_PRESETS } from "./filterPresets";
+import { loadStates } from "./SceneState";
+import type {
+  CompositionAPI,
+  LayerId,
+} from "../composition-api/CompositionAPI";
 
 interface LayerControlState {
   visible: boolean;
@@ -40,39 +23,12 @@ export class SceneBuilder {
   private dropZone: HTMLDivElement;
   private visible = false;
   private activeLayer: LayerId = "background";
-  private controlState: Record<LayerId, LayerControlState> = {
-    background: { visible: true, currentFilter: "None", filterIntensity: 100 },
-    asset: { visible: true, currentFilter: "None", filterIntensity: 100 },
-    fixed: { visible: true, currentFilter: "None", filterIntensity: 100 },
-    status: { visible: true, currentFilter: "None", filterIntensity: 100 },
-    webcam: { visible: true, currentFilter: "None", filterIntensity: 100 },
-  };
-  private filterInstances = new Map<LayerId, Filter | null>();
-
   private currentProject = "";
   private contentEl: HTMLDivElement;
-  private bgLayer: BackgroundLayer;
-  private assetLayer: Container;
-  private fixedLayer: FixedAssetLayer;
-  private webcam: WebcamAsset;
-  private statusLayer: StatusOverlay;
-  private textOverlay: TextOverlay;
+  private api: CompositionAPI;
 
-  constructor(
-    bgLayer: BackgroundLayer,
-    assetLayer: Container,
-    fixedLayer: FixedAssetLayer,
-    statusLayer: StatusOverlay,
-    webcam: WebcamAsset,
-    textOverlay: TextOverlay,
-    project: string,
-  ) {
-    this.bgLayer = bgLayer;
-    this.assetLayer = assetLayer;
-    this.fixedLayer = fixedLayer;
-    this.webcam = webcam;
-    this.statusLayer = statusLayer;
-    this.textOverlay = textOverlay;
+  constructor(api: CompositionAPI, project: string) {
+    this.api = api;
     this.currentProject = project;
 
     const root = document.createElement("div");
@@ -169,7 +125,7 @@ export class SceneBuilder {
   }
 
   private renderLayer(layerId: LayerId): void {
-    const state = this.controlState[layerId];
+    const state = this.api.getControlState(layerId);
     const avail = this.getAvailableAssets(layerId);
     const loaded = this.getLoadedAssets(layerId);
 
@@ -178,36 +134,28 @@ export class SceneBuilder {
     this.contentEl
       .querySelector(".sb-vis-toggle")
       ?.addEventListener("change", (e) => {
-        state.visible = (e.target as HTMLInputElement).checked;
-        this.setLayerVisible(layerId, state.visible);
+        const visible = (e.target as HTMLInputElement).checked;
+        this.api.setLayerVisibility(layerId, visible);
       });
 
     this.contentEl
       .querySelector(".sb-filter-select")
       ?.addEventListener("change", (e) => {
         const name = (e.target as HTMLSelectElement).value;
-        state.currentFilter = name;
         const sliderRow = this.contentEl.querySelector(
           ".sb-filter-slider-row",
         ) as HTMLElement;
         if (sliderRow) sliderRow.style.display = name === "None" ? "none" : "";
-        this.applyFilter(layerId, name);
+        this.api.setFilter(layerId, name);
       });
 
     this.contentEl
       .querySelector(".sb-filter-slider")
       ?.addEventListener("input", (e) => {
         const val = parseInt((e.target as HTMLInputElement).value, 10);
-        state.filterIntensity = val;
         const label = this.contentEl.querySelector(".sb-filter-val");
         if (label) label.textContent = `${val}%`;
-        const inst = this.filterInstances.get(layerId);
-        if (inst)
-          this.adjustFilterIntensity(
-            inst,
-            this.controlState[layerId].currentFilter,
-            val,
-          );
+        this.api.adjustIntensity(layerId, val);
       });
 
     this.contentEl.querySelectorAll(".sb-draggable").forEach((el) => {
@@ -218,94 +166,13 @@ export class SceneBuilder {
 
     this.contentEl.querySelectorAll(".sb-loaded-remove").forEach((el) => {
       el.addEventListener("click", () => {
-        this.removeAsset(layerId, (el as HTMLElement).dataset.key!);
+        const key = (el as HTMLElement).dataset.key!;
+        if (layerId === "asset" || layerId === "fixed") {
+          this.api.removeAsset(key, layerId);
+        }
         this.renderLayer(layerId);
       });
     });
-  }
-
-  private getLayerContainer(layerId: LayerId): Container {
-    switch (layerId) {
-      case "background":
-        return this.bgLayer;
-      case "asset":
-        return this.assetLayer;
-      case "fixed":
-        return this.fixedLayer;
-      case "status":
-        return this.statusLayer;
-      case "webcam":
-        return this.webcam;
-    }
-  }
-
-  private setLayerVisible(layerId: LayerId, visible: boolean): void {
-    switch (layerId) {
-      case "background":
-        this.bgLayer.visible = visible;
-        break;
-      case "asset":
-        this.assetLayer.visible = visible;
-        break;
-      case "fixed":
-        this.fixedLayer.visible = visible;
-        break;
-      case "status":
-        this.statusLayer.visible = visible;
-        break;
-      case "webcam":
-        this.webcam.visible = visible;
-        break;
-    }
-  }
-
-  private applyFilter(layerId: LayerId, presetName: string): void {
-    const container = this.getLayerContainer(layerId);
-    if (presetName === "None" || !presetName) {
-      (container as unknown as { filters: unknown }).filters = null;
-      this.filterInstances.set(layerId, null);
-      return;
-    }
-    const preset = FILTER_PRESETS.find((p) => p.name === presetName);
-    if (!preset) {
-      (container as unknown as { filters: unknown }).filters = null;
-      this.filterInstances.set(layerId, null);
-      return;
-    }
-    const filter = preset.create();
-    this.filterInstances.set(layerId, filter);
-    if (filter) {
-      this.adjustFilterIntensity(
-        filter,
-        presetName,
-        this.controlState[layerId].filterIntensity,
-      );
-      (container as unknown as { filters: unknown }).filters = [filter];
-    } else {
-      (container as unknown as { filters: unknown }).filters = null;
-    }
-  }
-
-  private adjustFilterIntensity(
-    filter: Filter,
-    presetName: string,
-    pct: number,
-  ): void {
-    const preset = getFilterPreset(presetName);
-    if (preset?.adjustIntensity) {
-      preset.adjustIntensity(filter, Math.max(0, Math.min(100, pct)) / 100);
-      return;
-    }
-    const t = Math.max(0, Math.min(100, pct)) / 100;
-    if (filter instanceof ColorMatrixFilter) {
-      filter.alpha = t;
-    } else if (filter instanceof BlurFilter) {
-      filter.strength = t * 20;
-    } else if (filter instanceof NoiseFilter) {
-      filter.noise = t;
-    } else if (filter instanceof AlphaFilter) {
-      filter.alpha = t;
-    }
   }
 
   private layerContentHTML(
@@ -413,42 +280,14 @@ export class SceneBuilder {
   private getLoadedAssets(
     layerId: LayerId,
   ): { key: string; type: string; coords?: string }[] {
-    switch (layerId) {
-      case "background": {
-        if (this.bgLayer.children.length === 0) return [];
-        return this.bgLayer.children
-          .filter((c) => c instanceof Sprite)
-          .map((c) => {
-            const s = c as Sprite;
-            const k = s.label || s.texture.label || "background";
-            return {
-              key: k,
-              type: k.toLowerCase().endsWith(".mp4") ? "video" : "image",
-            };
-          });
-      }
-      case "fixed":
-        return this.fixedLayer.children.map((c) => {
-          const alias = c instanceof FixedAsset ? c.alias : c.label;
-          return {
-            key: alias || `fixed-asset-${this.fixedLayer.children.indexOf(c)}`,
-            type: alias?.toLowerCase().endsWith(".gif") ? "gif" : "image",
-            coords: `(${Math.round(c.x)}, ${Math.round(c.y)})`,
-          };
-        });
-      case "status":
-        return [{ key: "hearts + xp + level", type: "image" }];
-      case "webcam":
-        return this.webcam.visible
-          ? [{ key: "webcam-feed", type: "video" }]
-          : [];
-      case "asset":
-        return this.assetLayer.children.map((c) => ({
-          key: c.label || "asset",
-          type: "image",
-          coords: `(${Math.round(c.x)}, ${Math.round(c.y)})`,
-        }));
-    }
+    return this.api.getLayerAssets(layerId).map((a) => ({
+      key: a.alias,
+      type: a.type,
+      coords:
+        a.x !== undefined && a.y !== undefined
+          ? `(${Math.round(a.x)}, ${Math.round(a.y)})`
+          : undefined,
+    }));
   }
 
   private onDragStart(e: DragEvent, key: string): void {
@@ -515,147 +354,21 @@ export class SceneBuilder {
 
     switch (layerId) {
       case "asset":
-        await this.addSpriteToAssetLayer(key, stageX, stageY);
-        break;
       case "fixed":
-        await this.addSpriteToFixedLayer(key, stageX, stageY);
+        await this.api.placeAsset(key, stageX, stageY, layerId);
         break;
       case "background": {
-        this.bgLayer.setMultipleBackgrounds(this.currentProject);
+        await this.api.setBackground(key);
         break;
       }
     }
     this.renderLayer(this.activeLayer);
   }
 
-  private async addSpriteToAssetLayer(
-    key: string,
-    x: number,
-    y: number,
-  ): Promise<void> {
-    const entry = getProjectAssets(this.currentProject).find(
-      (a) => a.key === key,
-    );
-    if (!entry) return;
-
-    try {
-      if (entry.type === "gif") {
-        const source = await Assets.load(key);
-        const gif = new GifSprite({ source, autoPlay: true });
-        gif.anchor.set(0.5);
-        gif.position.set(x, y);
-        gif.scale.set(0.5);
-        gif.label = key;
-        this.assetLayer.addChild(gif);
-        return;
-      }
-
-      const texture = await Assets.load<Texture>(key);
-      const sprite = new Sprite({ texture, anchor: 0.5 });
-      sprite.position.set(x, y);
-      sprite.scale.set(0.5);
-      sprite.label = key;
-      this.assetLayer.addChild(sprite);
-    } catch (err) {
-      console.error("Failed to load dropped asset:", key, err);
-    }
-  }
-
-  private async addSpriteToFixedLayer(
-    key: string,
-    x: number,
-    y: number,
-  ): Promise<void> {
-    try {
-      const ext = key.split(".").pop()?.toLowerCase();
-      let child: Container;
-      if (ext === "gif") {
-        const source = await Assets.load(key);
-        const gif = new GifSprite({ source, autoPlay: true });
-        gif.anchor.set(0.5);
-        child = gif;
-      } else {
-        const texture = await Assets.load<Texture>(key);
-        child = new Sprite({ texture, anchor: 0.5 });
-      }
-      child.position.set(x, y);
-      child.scale.set(0.5);
-      child.eventMode = "static";
-      child.cursor = "grab";
-      child.label = key;
-      this.fixedLayer.addChild(child);
-      this.setupFixedDrag(child);
-    } catch (err) {
-      console.error("Failed to load dropped fixed asset:", key, err);
-    }
-  }
-
-  private setupFixedDrag(child: Container): void {
-    let dragging = false;
-    let offset = { x: 0, y: 0 };
-
-    child.on("pointerdown", (e) => {
-      dragging = true;
-      child.cursor = "grabbing";
-      const parent = child.parent;
-      if (!parent) return;
-      const pos = parent.toLocal(e.global);
-      offset = { x: child.x - pos.x, y: child.y - pos.y };
-    });
-
-    child.on("globalpointermove", (e) => {
-      if (!dragging) return;
-      const parent = child.parent;
-      if (!parent) return;
-      const pos = parent.toLocal(e.global);
-      child.x = pos.x + offset.x;
-      child.y = pos.y + offset.y;
-    });
-
-    const stop = () => {
-      dragging = false;
-      child.cursor = "grab";
-    };
-    child.on("pointerup", stop);
-    child.on("pointerupoutside", stop);
-  }
-
-  private removeAsset(layerId: LayerId, key: string): void {
-    switch (layerId) {
-      case "fixed": {
-        const child = this.fixedLayer.children.find(
-          (c) =>
-            (c instanceof FixedAsset && c.alias === key) || c.label === key,
-        );
-        if (child) {
-          child.removeFromParent();
-          child.destroy({ children: true });
-        }
-        break;
-      }
-      case "background":
-        if (this.bgLayer.children.length > 0) {
-          const last = this.bgLayer.children[this.bgLayer.children.length - 1];
-          last.removeFromParent();
-          last.destroy({ children: true });
-        }
-        break;
-    }
-  }
-
   // ─── Scene state management ───
 
-  private getStates(): SceneState[] {
-    return loadStates(this.currentProject);
-  }
-
-  private persistStates(states: SceneState[]): void {
-    saveStates(this.currentProject, states);
-    this.populateStatesDropdown(states);
-  }
-
-  private populateStatesDropdown(states?: SceneState[]): void {
-    const list = states ?? this.getStates();
+  private populateStatesDropdown(): void {
+    const list = loadStates(this.currentProject);
     const sel = this.element.querySelector(
       ".sb-states-select",
     ) as HTMLSelectElement;
@@ -665,77 +378,14 @@ export class SceneBuilder {
       list.map((s, i) => `<option value="${i}">${s.name}</option>`).join("");
   }
 
-  private serializeCurrentState(name: string): SceneState {
-    const fixedAssets: AssetEntry[] = [];
-    const draggedAssets: AssetEntry[] = [];
-
-    for (const child of this.fixedLayer.children) {
-      if (child instanceof FixedAsset) {
-        fixedAssets.push({
-          alias: child.alias,
-          x: child.x,
-          y: child.y,
-          scale: child.spriteScale,
-        });
-      } else {
-        draggedAssets.push({
-          alias: child.label || "",
-          x: child.x,
-          y: child.y,
-          scale: child.scale.x,
-        });
-      }
-    }
-
-    for (const child of this.assetLayer.children) {
-      draggedAssets.push({
-        alias: child.label || "",
-        x: child.x,
-        y: child.y,
-        scale: child.scale.x,
-      });
-    }
-
-    const layers: Record<
-      string,
-      { visible: boolean; filter: string; filterIntensity: number }
-    > = {};
-    for (const [id, st] of Object.entries(this.controlState)) {
-      layers[id] = {
-        visible: st.visible,
-        filter: st.currentFilter,
-        filterIntensity: st.filterIntensity,
-      };
-    }
-
-    const textPos = this.textOverlay.textPosition;
-    const textOverlay = textPos
-      ? {
-          x: textPos.x,
-          y: textPos.y,
-          currentIdx: this.textOverlay.currentIndex,
-        }
-      : null;
-
-    return {
-      name,
-      timestamp: Date.now(),
-      fixedAssets,
-      draggedAssets,
-      layers,
-      textOverlay,
-    };
-  }
-
   private saveCurrentState(): void {
     const name = prompt(
       "Name this scene state:",
-      `State ${this.getStates().length + 1}`,
+      `State ${loadStates(this.currentProject).length + 1}`,
     );
     if (!name) return;
-    const states = this.getStates();
-    states.push(this.serializeCurrentState(name));
-    this.persistStates(states);
+    this.api.saveState(name);
+    this.populateStatesDropdown();
   }
 
   private async loadSelectedState(): Promise<void> {
@@ -745,81 +395,7 @@ export class SceneBuilder {
     const idx = parseInt(sel?.value, 10);
     if (isNaN(idx)) return;
 
-    const states = this.getStates();
-    const st = states[idx];
-    if (!st) return;
-
-    // Clear layers
-    this.fixedLayer.removeChildren();
-    this.assetLayer.removeChildren();
-    this.textOverlay.clear();
-
-    // Restore layer visibility and filters
-    for (const [id, layerSt] of Object.entries(st.layers)) {
-      const lid = id as LayerId;
-      if (this.controlState[lid]) {
-        this.controlState[lid].visible = layerSt.visible;
-        this.controlState[lid].currentFilter = layerSt.filter;
-        this.controlState[lid].filterIntensity = layerSt.filterIntensity;
-        this.setLayerVisible(lid, layerSt.visible);
-        this.applyFilter(lid, layerSt.filter);
-      }
-    }
-
-    // Restore fixed assets
-    for (const fa of st.fixedAssets) {
-      try {
-        const cfg = {
-          file: fa.alias.split("/").pop() || "",
-          x: fa.x / 1920,
-          y: fa.y / 1080,
-        };
-        const asset = await FixedAsset.load(fa.alias, cfg);
-        asset.x = fa.x;
-        asset.y = fa.y;
-        asset.spriteScale = fa.scale;
-        this.fixedLayer.addChild(asset);
-      } catch {
-        // skip failed
-      }
-    }
-
-    // Restore dragged assets
-    for (const da of st.draggedAssets) {
-      if (!da.alias) continue;
-      try {
-        const ext = da.alias.split(".").pop()?.toLowerCase();
-        let child: Container;
-        if (ext === "gif") {
-          const source = await Assets.load(da.alias);
-          const gif = new GifSprite({ source, autoPlay: true });
-          gif.anchor.set(0.5);
-          child = gif;
-        } else {
-          const texture = await Assets.load<Texture>(da.alias);
-          child = new Sprite({ texture, anchor: 0.5 });
-        }
-        child.position.set(da.x, da.y);
-        child.scale.set(da.scale);
-        child.label = da.alias;
-        child.eventMode = "static";
-        child.cursor = "grab";
-        this.fixedLayer.addChild(child);
-        this.setupFixedDrag(child);
-      } catch {
-        // skip
-      }
-    }
-
-    // Restore text overlay
-    if (st.textOverlay) {
-      this.textOverlay.goTo(
-        st.textOverlay.currentIdx,
-        st.textOverlay.x,
-        st.textOverlay.y,
-      );
-    }
-
+    await this.api.loadState(idx);
     if (this.visible) this.renderLayer(this.activeLayer);
   }
 
@@ -830,13 +406,13 @@ export class SceneBuilder {
     const idx = parseInt(sel?.value, 10);
     if (isNaN(idx)) return;
 
-    let states = this.getStates();
-    states = states.filter((_, i) => i !== idx);
-    this.persistStates(states);
+    this.api.deleteState(idx);
+    this.populateStatesDropdown();
   }
 
   public setProject(name: string): void {
     this.currentProject = name;
+    this.api.setProject(name);
     if (this.visible) {
       this.populateStatesDropdown();
       this.renderLayer(this.activeLayer);
