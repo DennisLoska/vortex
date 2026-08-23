@@ -24,8 +24,11 @@ import {
 } from "../scene-builder/SceneState";
 import {
   resolveAssetAlias,
+  resolveFilterPreset,
+  resolveLayer,
   clampCoord,
   clampScale,
+  clampIntensity,
 } from "./aliasResolver";
 import {
   getProjectAssets,
@@ -235,35 +238,51 @@ export class CompositionAPI {
   // ─── Filters ───
 
   setFilter(layer: LayerId, presetName: string, intensity?: number): boolean {
-    const container = this.getLayerContainer(layer);
+    const resolvedLayer = resolveLayer(layer as string);
+    const lid = (resolvedLayer.layer as LayerId) || layer;
+    const container = this.getLayerContainer(lid);
     if (!container) return false;
 
-    this.controlState[layer].currentFilter = presetName;
-    if (intensity !== undefined) {
-      this.controlState[layer].filterIntensity = intensity;
+    // resolve preset case-insensitive / hyphen etc.
+    let canonicalPreset = presetName?.trim() ?? "";
+    if (canonicalPreset && canonicalPreset !== "None") {
+      const r = resolveFilterPreset(canonicalPreset, FILTER_PRESETS.map((p) => p.name));
+      if (r.preset) canonicalPreset = r.preset;
     }
 
-    if (presetName === "None" || !presetName) {
+    const intensityClamped = intensity !== undefined ? clampIntensity(intensity) : undefined;
+
+    this.controlState[lid].currentFilter = canonicalPreset;
+    if (intensityClamped !== undefined) {
+      this.controlState[lid].filterIntensity = intensityClamped;
+    }
+
+    if (canonicalPreset === "None" || !canonicalPreset) {
       (container as unknown as { filters: unknown }).filters = null;
-      this.filterInstances.set(layer, null);
+      this.filterInstances.set(lid, null);
       return true;
     }
 
-    const preset = FILTER_PRESETS.find((p) => p.name === presetName);
+    const preset = FILTER_PRESETS.find((p) => p.name === canonicalPreset);
     if (!preset) {
       (container as unknown as { filters: unknown }).filters = null;
-      this.filterInstances.set(layer, null);
+      this.filterInstances.set(lid, null);
       return false;
     }
 
-    const filter = preset.create();
-    this.filterInstances.set(layer, filter);
+    let filter: Filter | null = null;
+    try {
+      filter = preset.create();
+    } catch {
+      filter = null;
+    }
+    this.filterInstances.set(lid, filter);
     if (filter) {
-      this.adjustFilterIntensity(
-        filter,
-        presetName,
-        this.controlState[layer].filterIntensity,
-      );
+      try {
+        this.adjustFilterIntensity(filter, canonicalPreset, this.controlState[lid].filterIntensity);
+      } catch {
+        /* ignore intensity adjust failures in headless */
+      }
       (container as unknown as { filters: unknown }).filters = [filter];
     } else {
       (container as unknown as { filters: unknown }).filters = null;
@@ -272,26 +291,33 @@ export class CompositionAPI {
   }
 
   clearFilter(layer: LayerId): boolean {
-    return this.setFilter(layer, "None");
+    const resolved = resolveLayer(layer as string);
+    const lid = (resolved.layer as LayerId) || layer;
+    return this.setFilter(lid, "None");
   }
 
   adjustIntensity(layer: LayerId, pct: number): void {
-    this.controlState[layer].filterIntensity = pct;
-    const inst = this.filterInstances.get(layer);
+    const resolved = resolveLayer(layer as string);
+    const lid = (resolved.layer as LayerId) || layer;
+    const clamped = clampIntensity(pct);
+    const cs = this.controlState[lid];
+    if (!cs) return;
+    cs.filterIntensity = clamped;
+    const inst = this.filterInstances.get(lid);
     if (inst) {
-      this.adjustFilterIntensity(
-        inst,
-        this.controlState[layer].currentFilter,
-        pct,
-      );
+      this.adjustFilterIntensity(inst, cs.currentFilter, clamped);
     }
   }
 
   // ─── Visibility ───
 
   setLayerVisibility(layer: LayerId, visible: boolean): void {
-    this.controlState[layer].visible = visible;
-    const container = this.getLayerContainer(layer);
+    const resolved = resolveLayer(layer as string);
+    const lid = (resolved.layer as LayerId) || layer;
+    const cs = this.controlState[lid];
+    if (!cs) return;
+    cs.visible = visible;
+    const container = this.getLayerContainer(lid);
     if (container) container.visible = visible;
   }
 
@@ -320,8 +346,11 @@ export class CompositionAPI {
 
   // ─── Webcam ───
 
-  setWebcamPreset(index: number): void {
-    this.webcam.setPreset(index);
+  setWebcamPreset(index: number): number {
+    const raw = Math.floor(Number(index));
+    const clamped = Number.isNaN(raw) ? 0 : Math.max(0, Math.min(13, raw));
+    this.webcam.setPreset(clamped);
+    return clamped;
   }
 
   toggleWebcam(): void {
@@ -331,7 +360,9 @@ export class CompositionAPI {
   // ─── Text ───
 
   setTextIndex(index: number): void {
-    this.textOverlay.goTo(index);
+    const raw = Math.floor(Number(index));
+    const safe = Number.isNaN(raw) ? 0 : raw;
+    this.textOverlay.goTo(safe);
   }
 
   nextText(): void {
@@ -339,7 +370,9 @@ export class CompositionAPI {
   }
 
   setTextPosition(x: number, y: number): void {
-    this.textOverlay.setTextPosition(x, y);
+    const cx = clampCoord(Number(x) || 0, 1920);
+    const cy = clampCoord(Number(y) || 0, 1080);
+    this.textOverlay.setTextPosition(cx, cy);
   }
 
   // ─── State ───
@@ -542,7 +575,9 @@ export class CompositionAPI {
   // ─── Internal ───
 
   private getLayerContainer(layer: LayerId): Container | null {
-    switch (layer) {
+    const r = resolveLayer(layer as string);
+    const lid = (r.layer as LayerId) || layer;
+    switch (lid) {
       case "background":
         return this.bgLayer;
       case "asset":
