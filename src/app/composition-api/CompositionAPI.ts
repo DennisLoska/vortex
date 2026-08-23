@@ -22,6 +22,16 @@ import {
   type AssetEntry,
   type SceneState,
 } from "../scene-builder/SceneState";
+import {
+  resolveAssetAlias,
+  clampCoord,
+  clampScale,
+} from "./aliasResolver";
+import {
+  getProjectAssets,
+  getProjectFixAssets,
+  getProjectBackgrounds,
+} from "../assetManifest";
 
 export type LayerId = "background" | "asset" | "fixed" | "status" | "webcam";
 
@@ -84,7 +94,38 @@ export class CompositionAPI {
   // ─── Guardrail ───
 
   private validateAlias(alias: string): boolean {
-    return alias.startsWith(`${this.currentProject}/`);
+    return alias.trim().startsWith(`${this.currentProject}/`);
+  }
+
+  private getAvailableAliases(): string[] {
+    try {
+      const fix = getProjectFixAssets(this.currentProject);
+      const pool = getProjectAssets(this.currentProject).map((p) => p.key);
+      const bg = getProjectBackgrounds(this.currentProject);
+      return [...fix, ...pool, ...bg.videoAliases, ...bg.imageAliases];
+    } catch {
+      return [];
+    }
+  }
+
+  private resolveAliasForContainer(
+    requested: string,
+    container: Container,
+  ): string | null {
+    const avail = this.getAvailableAliases();
+    const labels = container.children.map((c) => c.label || "").filter(Boolean) as string[];
+    // prefer labels present in container, then manifest
+    const combined = [...new Set([...labels, ...avail])];
+    const r = resolveAssetAlias(requested, combined);
+    if (r.alias) {
+      // ensure resolved alias actually exists in container for remove/move
+      if (labels.includes(r.alias)) return r.alias;
+      // for place, manifest existence is enough; container check not needed
+      if (avail.includes(r.alias)) return r.alias;
+      // if labels empty (no children), fallback to avail
+      return r.alias;
+    }
+    return null;
   }
 
   // ─── Assets ───
@@ -96,25 +137,35 @@ export class CompositionAPI {
     layer: "asset" | "fixed",
     scale = 0.5,
   ): Promise<boolean> {
-    if (!this.validateAlias(alias)) return false;
+    const trimmed = alias.trim();
+    let canonical = trimmed;
+    const available = this.getAvailableAliases();
+    if (available.length > 0) {
+      const r = resolveAssetAlias(trimmed, available);
+      if (r.alias) canonical = r.alias;
+    }
+    if (!this.validateAlias(canonical)) return false;
+    const cx = clampCoord(x, 1920);
+    const cy = clampCoord(y, 1080);
+    const cs = clampScale(scale);
 
     try {
-      const ext = alias.split(".").pop()?.toLowerCase();
+      const ext = canonical.split(".").pop()?.toLowerCase();
       let child: Container;
 
       if (ext === "gif") {
-        const source = await Assets.load(alias);
+        const source = await Assets.load(canonical);
         const gif = new GifSprite({ source, autoPlay: true });
         gif.anchor.set(0.5);
         child = gif;
       } else {
-        const texture = await Assets.load<Texture>(alias);
+        const texture = await Assets.load<Texture>(canonical);
         child = new Sprite({ texture, anchor: 0.5 });
       }
 
-      child.position.set(x, y);
-      child.scale.set(scale);
-      child.label = alias;
+      child.position.set(cx, cy);
+      child.scale.set(cs);
+      child.label = canonical;
 
       if (layer === "fixed") {
         child.eventMode = "static";
@@ -127,13 +178,22 @@ export class CompositionAPI {
 
       return true;
     } catch {
+      // try fallback without resolver? already canonical
       return false;
     }
   }
 
   removeAsset(alias: string, layer: "asset" | "fixed"): boolean {
     const container = layer === "fixed" ? this.fixedLayer : this.assetLayer;
-    const child = container.children.find((c) => c.label === alias);
+    let target = alias.trim();
+    let child = container.children.find((c) => c.label === target);
+    if (!child) {
+      const resolved = this.resolveAliasForContainer(target, container);
+      if (resolved) {
+        child = container.children.find((c) => c.label === resolved);
+        if (child) target = resolved;
+      }
+    }
     if (!child) return false;
     child.removeFromParent();
     child.destroy({ children: true });
@@ -146,11 +206,29 @@ export class CompositionAPI {
     y: number,
     layer: "asset" | "fixed",
   ): boolean {
-    if (!this.validateAlias(alias)) return false;
+    const trimmed = alias.trim();
+    // try to resolve before validate to allow basename-only handling
+    let canonical = trimmed;
+    const avail = this.getAvailableAliases();
+    // if trimmed not prefixed with project, try basename resolution
+    if (!trimmed.startsWith(`${this.currentProject}/`) && avail.length > 0) {
+      const r = resolveAssetAlias(trimmed, avail);
+      if (r.alias) canonical = r.alias;
+    } else if (avail.length > 0) {
+      const r = resolveAssetAlias(trimmed, avail);
+      if (r.alias) canonical = r.alias;
+    }
+    if (!this.validateAlias(canonical)) return false;
     const container = layer === "fixed" ? this.fixedLayer : this.assetLayer;
-    const child = container.children.find((c) => c.label === alias);
+    const cx = clampCoord(x, 1920);
+    const cy = clampCoord(y, 1080);
+    let child = container.children.find((c) => c.label === canonical) || container.children.find((c) => c.label === trimmed);
+    if (!child) {
+      const resolved = this.resolveAliasForContainer(trimmed, container) || this.resolveAliasForContainer(canonical, container);
+      if (resolved) child = container.children.find((c) => c.label === resolved) as typeof child;
+    }
     if (!child) return false;
-    child.position.set(x, y);
+    child.position.set(cx, cy);
     return true;
   }
 
@@ -220,8 +298,20 @@ export class CompositionAPI {
   // ─── Background ───
 
   async setBackground(alias: string): Promise<boolean> {
-    if (!this.validateAlias(alias)) return false;
-    return this.bgLayer.setBackground(alias);
+    const trimmed = alias.trim();
+    let canonical = trimmed;
+    try {
+      const bg = getProjectBackgrounds(this.currentProject);
+      const avail = [...bg.videoAliases, ...bg.imageAliases];
+      if (avail.length > 0) {
+        const r = resolveAssetAlias(trimmed, avail);
+        if (r.alias) canonical = r.alias;
+      }
+    } catch {
+      /* ignore */
+    }
+    if (!this.validateAlias(canonical)) return false;
+    return this.bgLayer.setBackground(canonical);
   }
 
   nextBackground(): void {
