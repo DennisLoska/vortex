@@ -135,9 +135,15 @@ async function executeAction(
       if (!lid || (lid !== "asset" && lid !== "fixed"))
         return fail(`Invalid layer: ${layer}. Valid: asset, fixed`);
       const success = api.removeAsset(alias, lid as "asset" | "fixed");
-      return success
-        ? ok(`Removed ${alias} from ${lid}`)
-        : fail(`Asset not found: ${alias}${assetSuggestion(alias, api, lid)}`);
+      if (success) return ok(`Removed ${alias} from ${lid}`);
+      // idempotent: if alias exists in manifest but not in scene, treat as already removed
+      const available = api.getAvailableAssets().map((a) => a.alias);
+      if (available.includes(alias.trim())) {
+        return ok(`Asset not in scene — already removed: ${alias}`);
+      }
+      return fail(
+        `Asset not found: ${alias}${assetSuggestion(alias, api, lid)}`,
+      );
     }
 
     case "moveAsset": {

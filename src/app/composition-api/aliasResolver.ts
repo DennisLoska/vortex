@@ -67,19 +67,40 @@ export function resolveAssetAlias(
   if (withoutExtMatches.length > 1)
     return { alias: null, suggestion: withoutExtMatches.slice(0, 5) };
 
+  // singular/plural + levenshtein fallback
+  // try singular/plural variant of base (heart <-> hearts)
+  const altBases: string[] = [];
+  if (base.endsWith("s") && base.length > 3) altBases.push(base.slice(0, -1));
+  else altBases.push(base + "s");
+  for (const alt of altBases) {
+    const m = available.filter((a) => basenameNoExt(a).toLowerCase() === alt);
+    if (m.length === 1) return { alias: m[0], suggestion: [] };
+    if (m.length > 1) return { alias: null, suggestion: m.slice(0, 5) };
+  }
   // includes fallback (for basename only like "hearts" matching path)
   if (base.length >= 2) {
     const includes = available.filter((a) => a.toLowerCase().includes(base));
-    // if unique includes with exact basename, already handled; if multiple, suggest
     if (includes.length > 0 && includes.length <= 5) {
-      // if already multiple withoutExt, we already returned; this is for partial
       if (withoutExtMatches.length === 0) {
-        // if single include and basename matches partially, treat as resolved if unambiguous basename
-        // but for safety, if single include, resolve
         if (includes.length === 1)
           return { alias: includes[0], suggestion: [] };
+        // pick best levenshtein on basename if close (handles heart->hearts vs white_line_churn_heart)
+        const scored = includes
+          .map((a) => ({
+            a,
+            d: levenshtein(base, basenameNoExt(a).toLowerCase()),
+          }))
+          .sort((x, y) => x.d - y.d);
+        if (scored[0].d <= 1 && (scored[1]?.d ?? 99) > scored[0].d) {
+          return { alias: scored[0].a, suggestion: [] };
+        }
         return { alias: null, suggestion: includes.slice(0, 5) };
       }
+    }
+    // also try altBases includes
+    for (const alt of altBases) {
+      const inc2 = available.filter((a) => a.toLowerCase().includes(alt));
+      if (inc2.length === 1) return { alias: inc2[0], suggestion: [] };
     }
   }
 

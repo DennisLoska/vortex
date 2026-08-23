@@ -111,13 +111,17 @@ export class CompositionAPI {
     }
   }
 
+  private getChildAlias(c: Container): string {
+    return (c as unknown as { alias?: string }).alias || c.label || "";
+  }
+
   private resolveAliasForContainer(
     requested: string,
     container: Container,
   ): string | null {
     const avail = this.getAvailableAliases();
     const labels = container.children
-      .map((c) => c.label || "")
+      .map((c) => this.getChildAlias(c))
       .filter(Boolean) as string[];
     // prefer labels present in container, then manifest
     const combined = [...new Set([...labels, ...avail])];
@@ -191,11 +195,15 @@ export class CompositionAPI {
   removeAsset(alias: string, layer: "asset" | "fixed"): boolean {
     const container = layer === "fixed" ? this.fixedLayer : this.assetLayer;
     let target = alias.trim();
-    let child = container.children.find((c) => c.label === target);
+    let child = container.children.find(
+      (c) => this.getChildAlias(c) === target,
+    );
     if (!child) {
       const resolved = this.resolveAliasForContainer(target, container);
       if (resolved) {
-        child = container.children.find((c) => c.label === resolved);
+        child = container.children.find(
+          (c) => this.getChildAlias(c) === resolved,
+        );
         if (child) target = resolved;
       }
     }
@@ -228,15 +236,15 @@ export class CompositionAPI {
     const cx = clampCoord(x, 1920);
     const cy = clampCoord(y, 1080);
     let child =
-      container.children.find((c) => c.label === canonical) ||
-      container.children.find((c) => c.label === trimmed);
+      container.children.find((c) => this.getChildAlias(c) === canonical) ||
+      container.children.find((c) => this.getChildAlias(c) === trimmed);
     if (!child) {
       const resolved =
         this.resolveAliasForContainer(trimmed, container) ||
         this.resolveAliasForContainer(canonical, container);
       if (resolved)
         child = container.children.find(
-          (c) => c.label === resolved,
+          (c) => this.getChildAlias(c) === resolved,
         ) as typeof child;
     }
     if (!child) return false;
@@ -538,7 +546,7 @@ export class CompositionAPI {
     const loaded: AssetInfo[] = [];
     for (const child of this.assetLayer.children) {
       loaded.push({
-        alias: child.label || "unknown",
+        alias: this.getChildAlias(child) || "unknown",
         type: "image",
         x: child.x,
         y: child.y,
@@ -546,7 +554,7 @@ export class CompositionAPI {
     }
     for (const child of this.fixedLayer.children) {
       loaded.push({
-        alias: child.label || "unknown",
+        alias: this.getChildAlias(child) || "unknown",
         type: "image",
         x: child.x,
         y: child.y,
@@ -588,7 +596,7 @@ export class CompositionAPI {
           : [];
       case "asset":
         return this.assetLayer.children.map((c) => ({
-          alias: c.label || "asset",
+          alias: this.getChildAlias(c) || "asset",
           type: "image",
           x: c.x,
           y: c.y,
@@ -654,7 +662,7 @@ export class CompositionAPI {
         });
       } else {
         draggedAssets.push({
-          alias: child.label || "",
+          alias: this.getChildAlias(child) || "",
           x: child.x,
           y: child.y,
           scale: child.scale.x,
@@ -664,7 +672,7 @@ export class CompositionAPI {
 
     for (const child of this.assetLayer.children) {
       draggedAssets.push({
-        alias: child.label || "",
+        alias: this.getChildAlias(child) || "",
         x: child.x,
         y: child.y,
         scale: child.scale.x,
