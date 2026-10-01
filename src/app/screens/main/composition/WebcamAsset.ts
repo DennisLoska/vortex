@@ -95,9 +95,23 @@ export class WebcamAsset extends Container {
       const tracks = (this.videoElement.srcObject as MediaStream).getTracks();
       tracks.forEach((track) => track.stop());
     }
+    if (this.videoElement) {
+      try {
+        this.videoElement.pause();
+      } catch {
+        /* ignore */
+      }
+      this.videoElement.srcObject = null;
+    }
     this.videoElement = undefined;
-    this.sprite?.destroy();
-    this.sprite = undefined;
+    if (this.sprite) {
+      this.removeChild(this.sprite);
+      this.sprite.destroy({ texture: true, textureSource: true });
+      this.sprite = undefined;
+    }
+    if (this.blobMask?.parent) {
+      this.blobMask.removeFromParent();
+    }
   }
 
   public resize(bounds: { width: number; height: number }) {

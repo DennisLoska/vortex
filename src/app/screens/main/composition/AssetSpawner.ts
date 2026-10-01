@@ -19,6 +19,9 @@ export class AssetSpawner {
   private pool: PoolEntry[] = [];
   private paused = false;
   private running = false;
+  private texCache = new Map<string, Texture>();
+  private spawnGen = 0;
+  private extents = new Map<CompositionAsset, { hw: number; hh: number }>();
 
   private readonly gridCols = 4;
   private readonly gridRows = 3;
@@ -36,15 +39,18 @@ export class AssetSpawner {
   }
 
   public setProject(projectName: string) {
+    this.spawnGen++;
     this.buildPool(projectName);
   }
 
   public async start(bounds: { width: number; height: number }) {
     if (this.running) return;
     this.running = true;
-    while (this.running) {
+    const gen = ++this.spawnGen;
+    while (this.running && gen === this.spawnGen) {
       if (!this.paused) {
-        await this.spawn(bounds);
+        await this.spawn(bounds, gen);
+        if (gen !== this.spawnGen) return;
       }
       const interval = randomFloat(
         compositionConfig.spawnInterval.min,
@@ -55,6 +61,7 @@ export class AssetSpawner {
   }
 
   public stop() {
+    this.spawnGen++;
     this.running = false;
   }
 
@@ -67,10 +74,13 @@ export class AssetSpawner {
   }
 
   public clear() {
+    this.spawnGen++;
     for (const asset of this.assets) {
+      this.extents.delete(asset);
       asset.dispose();
     }
     for (const asset of this.dyingAssets) {
+      this.extents.delete(asset);
       asset.dispose();
     }
     this.assets = [];
@@ -93,6 +103,7 @@ export class AssetSpawner {
           this.occupiedCells.delete(cellIdx);
           this.assetCellMap.delete(asset);
         }
+        this.extents.delete(asset);
         this.assets.splice(i, 1);
       }
     }
@@ -101,6 +112,7 @@ export class AssetSpawner {
       const asset = this.dyingAssets[i];
       asset.update(ticker, bounds, globalTime);
       if (asset.isDead) {
+        this.extents.delete(asset);
         this.dyingAssets.splice(i, 1);
       }
     }
@@ -155,8 +167,9 @@ export class AssetSpawner {
     return { x, y, cellIdx };
   }
 
-  private async spawn(bounds: { width: number; height: number }) {
+  private async spawn(bounds: { width: number; height: number }, gen?: number) {
     if (this.pool.length === 0) return;
+    const activeGen = gen ?? this.spawnGen;
     if (this.assets.length >= compositionConfig.maxAssets) {
       const oldest = this.assets.shift();
       if (oldest) {
@@ -174,10 +187,21 @@ export class AssetSpawner {
       view: Container | null;
       profile: AnimationProfile;
       cleanup?: () => void;
+      hw?: number;
+      hh?: number;
     };
     try {
       result = await this.createView();
     } catch {
+      return;
+    }
+    if (activeGen !== this.spawnGen) {
+      result.view?.destroy({
+        children: true,
+        texture: false,
+        textureSource: false,
+      });
+      result.cleanup?.();
       return;
     }
     const { view, profile, cleanup } = result;
@@ -193,10 +217,15 @@ export class AssetSpawner {
       cleanup,
     );
     this.assetCellMap.set(asset, gridPos.cellIdx);
+    this.extents.set(asset, {
+      hw: result.hw ?? 150,
+      hh: result.hh ?? 150,
+    });
     this.container.addChild(view);
 
-    if (this.overlapsAny(view)) {
+    if (this.overlapsCached(gridPos.x, gridPos.y, asset)) {
       this.assetCellMap.delete(asset);
+      this.extents.delete(asset);
       asset.dispose();
       return;
     }
@@ -204,26 +233,39 @@ export class AssetSpawner {
     this.assets.push(asset);
   }
 
-  private overlapsAny(view: Container): boolean {
-    const b = view.getBounds();
+  private overlapsCached(
+    x: number,
+    y: number,
+    self: CompositionAsset,
+  ): boolean {
+    const e = this.extents.get(self);
+    if (!e) return false;
     for (const existing of this.assets) {
-      const eb = existing.view.getBounds();
-      if (
-        b.x < eb.x + eb.width &&
-        b.x + b.width > eb.x &&
-        b.y < eb.y + eb.height &&
-        b.y + b.height > eb.y
-      ) {
-        return true;
-      }
+      if (existing === self) continue;
+      const o = this.extents.get(existing);
+      if (!o) continue;
+      const dx = Math.abs(existing.view.x - x);
+      const dy = Math.abs(existing.view.y - y);
+      if (dx < e.hw + o.hw && dy < e.hh + o.hh) return true;
     }
     return false;
+  }
+
+  private async loadTextureCached(key: string): Promise<Texture> {
+    let t = this.texCache.get(key);
+    if (!t) {
+      t = await Assets.load<Texture>(key);
+      this.texCache.set(key, t);
+    }
+    return t;
   }
 
   private async createView(): Promise<{
     view: Container | null;
     profile: AnimationProfile;
     cleanup?: () => void;
+    hw?: number;
+    hh?: number;
   }> {
     try {
       const entry = this.pool[Math.floor(Math.random() * this.pool.length)];
@@ -232,34 +274,52 @@ export class AssetSpawner {
         const source = await Assets.load(entry.key);
         const gif = new GifSprite({ source, autoPlay: true });
         gif.anchor.set(0.5);
-        gif.scale.set(0.35 + Math.random() * 0.4);
-        return { view: gif, profile: "pop" };
+        const s = 0.35 + Math.random() * 0.4;
+        gif.scale.set(s);
+        const hw = ((source.width || 400) * s) / 2;
+        const hh = ((source.height || 400) * s) / 2;
+        return { view: gif, profile: "pop", hw, hh };
       }
 
       if (entry.type === "video") {
-        const texture = await Assets.load<Texture>(entry.key);
+        const texture = await this.loadTextureCached(entry.key);
         const source = texture.source as VideoSource;
-        const videoElement = source?.resource;
+        const videoElement = source?.resource as HTMLVideoElement | undefined;
         if (videoElement) {
           videoElement.loop = true;
-          videoElement.play();
+          videoElement.muted = true;
+          void videoElement.play().catch(() => {});
         } else {
           console.warn("Video resource not ready:", entry.key);
         }
+        const scale = 0.35 + Math.random() * 0.4;
         const video = new Sprite({ texture, anchor: 0.5 });
-        video.scale.set(0.35 + Math.random() * 0.4);
+        video.scale.set(scale);
         const cleanup = () => {
           if (videoElement && !videoElement.paused) {
             videoElement.pause();
           }
         };
-        return { view: video, profile: "gentle", cleanup };
+        return {
+          view: video,
+          profile: "gentle",
+          cleanup,
+          hw: (texture.width * scale) / 2,
+          hh: (texture.height * scale) / 2,
+        };
       }
 
-      const texture = await Assets.load<Texture>(entry.key);
+      const texture = await this.loadTextureCached(entry.key);
+      const scale = 0.35 + Math.random() * 0.4;
       const sprite = new Sprite({ texture, anchor: 0.5 });
-      sprite.scale.set(0.35 + Math.random() * 0.4);
-      return { view: sprite, profile: "gentle" };
+      sprite.scale.set(scale);
+      // Upload ahead to avoid first-frame hitch when possible
+      return {
+        view: sprite,
+        profile: "gentle",
+        hw: (texture.width * scale) / 2,
+        hh: (texture.height * scale) / 2,
+      };
     } catch (err) {
       console.error("Failed to create asset view:", err);
       return { view: null, profile: "gentle" };

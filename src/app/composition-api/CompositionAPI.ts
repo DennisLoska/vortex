@@ -1,4 +1,4 @@
-import { Container, Sprite, Texture, Assets } from "pixi.js";
+import { Container, Sprite, Texture, Assets, Rectangle } from "pixi.js";
 import { GifSprite } from "pixi.js/gif";
 import type { Filter } from "pixi.js";
 import {
@@ -209,7 +209,7 @@ export class CompositionAPI {
     }
     if (!child) return false;
     child.removeFromParent();
-    child.destroy({ children: true });
+    child.destroy({ children: true, texture: false, textureSource: false });
     return true;
   }
 
@@ -280,6 +280,8 @@ export class CompositionAPI {
 
     if (canonicalPreset === "None" || !canonicalPreset) {
       (container as unknown as { filters: unknown }).filters = null;
+      (container as Container & { filterArea?: Rectangle }).filterArea =
+        undefined;
       this.filterInstances.set(lid, null);
       return true;
     }
@@ -308,6 +310,9 @@ export class CompositionAPI {
       } catch {
         /* ignore intensity adjust failures in headless */
       }
+      const c = container as Container & { filterArea?: Rectangle };
+      // Bound filter passes to viewport to avoid fullscreen remeasure.
+      c.filterArea = new Rectangle(0, 0, 1920, 1080);
       (container as unknown as { filters: unknown }).filters = [filter];
     } else {
       (container as unknown as { filters: unknown }).filters = null;
@@ -424,8 +429,14 @@ export class CompositionAPI {
     }
     if (!st) return false;
 
-    this.fixedLayer.removeChildren();
-    this.assetLayer.removeChildren();
+    for (const child of [...this.fixedLayer.children]) {
+      child.removeFromParent();
+      child.destroy({ children: true, texture: false, textureSource: false });
+    }
+    for (const child of [...this.assetLayer.children]) {
+      child.removeFromParent();
+      child.destroy({ children: true, texture: false, textureSource: false });
+    }
     this.textOverlay.clear();
 
     for (const [id, layerSt] of Object.entries(st.layers)) {

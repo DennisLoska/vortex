@@ -7,7 +7,7 @@ export class BackgroundLayer extends Container {
   private tempSprite: Sprite | null = null;
   private lastBounds = { width: 1920, height: 1080 };
   private transitioning = false;
-  private transitionDuration = 10;
+  private transitionDuration = 1.5;
   private transitionElapsed = 0;
 
   private videos: HTMLVideoElement[] = [];
@@ -194,11 +194,17 @@ export class BackgroundLayer extends Container {
       if (t >= 1) {
         const old = this.activeSprite;
         const oldVideo = this.getVideoForSprite(old);
-        if (oldVideo) void oldVideo.play();
+        if (oldVideo) {
+          try {
+            oldVideo.pause();
+          } catch {
+            /* ignore */
+          }
+        }
 
         this.zoomData.delete(old);
         this.removeChild(old);
-        old.destroy({ children: false, texture: false });
+        old.destroy({ children: false, texture: false, textureSource: false });
 
         this.activeSprite = this.tempSprite!;
         this.activeSprite.alpha = 1;
@@ -282,12 +288,49 @@ export class BackgroundLayer extends Container {
 
       this.tempSprite = newSprite;
       this.transitioning = true;
-      this.transitionDuration = 10;
+      this.transitionDuration = 1.5;
       this.transitionElapsed = 0;
       return true;
     } catch {
       return false;
     }
+  }
+
+  public setTransitionDuration(seconds: number): void {
+    this.transitionDuration = Math.max(0.1, Math.min(10, seconds));
+  }
+
+  public dispose(): void {
+    this.loadGen++;
+    for (const v of this.videos) {
+      try {
+        v.pause();
+      } catch {
+        /* ignore */
+      }
+    }
+    this.videos = [];
+    this.textures = [];
+    this.zoomData.clear();
+    if (this.activeSprite) {
+      this.removeChild(this.activeSprite);
+      this.activeSprite.destroy({
+        children: false,
+        texture: false,
+        textureSource: false,
+      });
+      this.activeSprite = null;
+    }
+    if (this.tempSprite) {
+      this.removeChild(this.tempSprite);
+      this.tempSprite.destroy({
+        children: false,
+        texture: false,
+        textureSource: false,
+      });
+      this.tempSprite = null;
+    }
+    this.transitioning = false;
   }
 
   /** Trigger the same random crossfade the auto-timer runs. */
@@ -319,7 +362,7 @@ export class BackgroundLayer extends Container {
     if (video) void video.play();
 
     this.transitioning = true;
-    this.transitionDuration = 10;
+    this.transitionDuration = 1.5;
     this.transitionElapsed = 0;
   }
 }

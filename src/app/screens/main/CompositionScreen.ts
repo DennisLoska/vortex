@@ -1,5 +1,5 @@
 import type { Ticker, Texture } from "pixi.js";
-import { ColorMatrixFilter, Color, Container } from "pixi.js";
+import { ColorMatrixFilter, Color, Container, Rectangle } from "pixi.js";
 
 import { engine } from "../../getEngine";
 import { getProjectNames } from "../../assetManifest";
@@ -26,7 +26,10 @@ export class CompositionScreen extends Container {
   private bounds = { width: 1920, height: 1080 };
   private paused = false;
   private globalTime = 0;
-  private themeFilter = new ColorMatrixFilter();
+  private assetThemeFilter = new ColorMatrixFilter();
+  private webcamThemeFilter = new ColorMatrixFilter();
+  private lastThemeAt = 0;
+  private keyHandler: ((event: KeyboardEvent) => void) | null = null;
   private projects = getProjectNames();
   private currentProject: string;
   private compositionAPI: CompositionAPI;
@@ -65,8 +68,10 @@ export class CompositionScreen extends Container {
 
     this.setupKeyboard();
 
-    this.assetLayer.filters = [this.themeFilter];
-    this.webcam.filters = [this.themeFilter];
+    this.assetLayer.filters = [this.assetThemeFilter];
+    this.webcam.filters = [this.webcamThemeFilter];
+    // Static decor caches well; asset/webcam stay dynamic for VJ motion.
+    this.fixedLayer.cacheAsTexture(false);
 
     this.compositionAPI = new CompositionAPI(
       this.background,
@@ -101,6 +106,10 @@ export class CompositionScreen extends Container {
   }
 
   private extractAndApplyTheme(texture: Texture) {
+    // Throttle CPU readback: max 1 per 2s, cheap downsample loop.
+    const now = performance.now();
+    if (now - this.lastThemeAt < 2000) return;
+    this.lastThemeAt = now;
     try {
       const result = engine().renderer.extract.pixels(texture);
       const px = result.pixels;
@@ -108,19 +117,23 @@ export class CompositionScreen extends Container {
         g = 0,
         b = 0,
         count = 0;
-      for (let i = 0; i < px.length; i += 4) {
+      // Stride 16 bytes (every 4th pixel) is enough for avg tint.
+      for (let i = 0; i < px.length; i += 16) {
         r += px[i];
         g += px[i + 1];
         b += px[i + 2];
         count++;
       }
+      if (count === 0) return;
       r = Math.round(r / count);
       g = Math.round(g / count);
       b = Math.round(b / count);
       const avg = new Color([r / 255, g / 255, b / 255]).toNumber();
-      this.themeFilter.reset();
-      this.themeFilter.tint(avg);
-      this.themeFilter.alpha = 0.5;
+      for (const f of [this.assetThemeFilter, this.webcamThemeFilter]) {
+        f.reset();
+        f.tint(avg);
+        f.alpha = 0.5;
+      }
     } catch {
       // extraction fails silently on some GPU/configs
     }
@@ -131,6 +144,7 @@ export class CompositionScreen extends Container {
     this.background.resize(this.bounds.width, this.bounds.height);
     this.textOverlay.resize(this.bounds.width, this.bounds.height);
     this.webcam.resize(this.bounds);
+    this.updateFilterAreas();
     engine().audio.bgm.play("main/sounds/bgm-main.mp3", { volume: 0.5 });
     this.spawner.start(this.bounds);
   }
@@ -184,6 +198,13 @@ export class CompositionScreen extends Container {
     this.textOverlay.resize(width, height);
     this.statusOverlay.resize(width, height);
     this.webcam.resize(this.bounds);
+    this.updateFilterAreas();
+  }
+
+  private updateFilterAreas() {
+    const area = new Rectangle(0, 0, this.bounds.width, this.bounds.height);
+    this.assetLayer.filterArea = area;
+    this.webcam.filterArea = area;
   }
 
   public async hide() {
@@ -191,6 +212,7 @@ export class CompositionScreen extends Container {
     this.spawner.stop();
     this.spawner.clear();
     this.fixedLayer.clear();
+    this.webcam.stop();
   }
 
   private async switchProject(name: string) {
@@ -202,13 +224,22 @@ export class CompositionScreen extends Container {
     this.textOverlay.setProject(name);
     this.sceneBuilder?.setProject(name);
     this.fixedLayer.clear();
-    this.background.removeChildren();
+    this.background.dispose();
     await this.prepare();
     await this.show();
   }
 
+  public destroy(options?: object): void {
+    if (this.keyHandler) {
+      window.removeEventListener("keydown", this.keyHandler);
+      this.keyHandler = null;
+    }
+    this.webcam.stop();
+    super.destroy(options);
+  }
+
   private setupKeyboard() {
-    window.addEventListener("keydown", (event) => {
+    this.keyHandler = (event: KeyboardEvent) => {
       if (
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement
@@ -259,6 +290,7 @@ export class CompositionScreen extends Container {
         event.preventDefault();
         this.switchProject(this.projects[num - 1]);
       }
-    });
+    };
+    window.addEventListener("keydown", this.keyHandler);
   }
 }

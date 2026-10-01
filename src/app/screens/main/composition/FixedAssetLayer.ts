@@ -56,9 +56,10 @@ export class FixedAssetLayer extends Container {
   }
 
   public clear() {
-    this.removeChildren();
-    for (const asset of this.fixedAssets) {
-      asset.destroy({ children: true, texture: false });
+    for (const child of [...this.children]) {
+      child.removeFromParent();
+      // Preserve shared textures; destroy graph only.
+      child.destroy({ children: true, texture: false, textureSource: false });
     }
     this.fixedAssets = [];
   }

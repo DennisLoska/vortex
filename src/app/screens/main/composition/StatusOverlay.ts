@@ -77,6 +77,7 @@ export class StatusOverlay extends Container {
       },
     });
     this.xpBarText.anchor.set(0.5);
+    this.xpBarText.resolution = 1;
 
     this.xpContainer = new Container();
     this.xpContainer.addChild(this.xpBarBg);
@@ -101,6 +102,7 @@ export class StatusOverlay extends Container {
     });
     this.addChild(this.levelText);
 
+    this.levelText.resolution = 1;
     this.buildXPBar();
     this.buildLevel();
   }
