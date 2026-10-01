@@ -4,8 +4,15 @@ import type {
   DestroyOptions,
   RendererDestroyOptions,
 } from "pixi.js";
-import { Application, Assets, extensions, ResizePlugin } from "pixi.js";
+import {
+  Application,
+  Assets,
+  extensions,
+  ResizePlugin,
+  CullerPlugin,
+} from "pixi.js";
 import "pixi.js/app";
+import "pixi.js/prepare";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore - This is a dynamically generated file by AssetPack
@@ -20,6 +27,7 @@ extensions.remove(ResizePlugin);
 extensions.add(CreationResizePlugin);
 extensions.add(CreationAudioPlugin);
 extensions.add(CreationNavigationPlugin);
+extensions.add(CullerPlugin);
 
 /**
  * The main creation engine class.
@@ -38,8 +46,17 @@ export class CreationEngine extends Application {
   public async init(opts: Partial<ApplicationOptions>): Promise<void> {
     opts.resizeTo ??= window;
     opts.resolution ??= getResolution();
+    opts.preference ??= "webgpu";
+    opts.antialias ??= false;
+    opts.powerPreference ??= "high-performance";
+    opts.gcActive ??= true;
+    opts.gcMaxUnusedTime ??= 60000;
+    opts.gcFrequency ??= 30000;
 
     await super.init(opts);
+
+    this.ticker.maxFPS = 60;
+    this.ticker.minFPS = 10;
 
     // Append the application canvas to the document body
     document.getElementById("pixi-container")!.appendChild(this.canvas);

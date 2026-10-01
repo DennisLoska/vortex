@@ -144,6 +144,7 @@ export class TextOverlay extends Container {
       },
     });
     text.anchor.set(0.5);
+    text.resolution = 1;
     text.eventMode = "static";
     text.cursor = "grab";
 

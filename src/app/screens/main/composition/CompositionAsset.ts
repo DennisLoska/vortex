@@ -145,7 +145,44 @@ export class CompositionAsset {
     this.disposed = true;
     this.onDispose?.();
     this.view.removeFromParent();
-    this.view.destroy({ children: true });
+    // Preserve shared textures in Assets cache; only destroy scene graph.
+    this.view.destroy({ children: true, texture: false, textureSource: false });
+  }
+
+  /** Reset for pool reuse without realloc. */
+  public reset(
+    view: Container,
+    bounds: { width: number; height: number },
+    profile: AnimationProfile,
+    startX: number,
+    startY: number,
+    onDispose?: () => void,
+  ) {
+    this.view = view;
+    this.profile = profile;
+    this.onDispose = onDispose;
+    this.disposed = false;
+    this.dying = false;
+    this.age = 0;
+    const config = animationProfiles[profile];
+    this.lifetime = randomFloat(config.lifetime.min, config.lifetime.max);
+    this.fadeDuration = config.fadeDuration;
+    this.startX = startX;
+    this.startY = startY;
+    this.startScale = 0.5 + Math.random() * 0.5;
+    this.startRotation =
+      (Math.random() - 0.5) * 2 * (config.rotationRange * (Math.PI / 180));
+    this.driftAngle = Math.random() * Math.PI * 2;
+    this.driftSpeed = randomFloat(config.driftSpeed.min, config.driftSpeed.max);
+    this.scalePhase = Math.random() * Math.PI * 2;
+    this.rotationPhase = Math.random() * Math.PI * 2;
+    view.x = this.startX;
+    view.y = this.startY;
+    view.scale.set(this.startScale);
+    view.rotation = this.startRotation;
+    view.alpha = this.fadeDuration === 0 ? 1 : 0;
+    view.visible = true;
+    void bounds;
   }
 
   public get isDead() {
